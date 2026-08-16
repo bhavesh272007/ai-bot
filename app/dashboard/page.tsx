@@ -5,13 +5,20 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRequireAuth } from "@/lib/useAuth";
 import { ChevronDown, Download } from "lucide-react";
-
-interface CodingSummary {
-  aiScore: number | null;
-  testsPassed: number | null;
-  testsTotal: number | null;
-  language: string | null;
-}
+import { toDisplayScore } from "@/lib/scoring";
+import {
+  ScoreChip,
+  Sparkline,
+  TrendBadge,
+  SubjectStamp,
+  SubjectDonut,
+  ScoreHistoryChart,
+  scoreColor,
+  type CodingSummary,
+  type CandidateAttempt,
+  type SubjectScore,
+  type SessionDetail,
+} from "@/components/dashboard/charts";
 
 interface Candidate {
   sessionId: string;
@@ -30,6 +37,15 @@ interface InterviewStat {
   candidates: Candidate[];
 }
 
+interface CandidateProfile {
+  email: string;
+  name: string | null;
+  attempts: CandidateAttempt[];
+  trend: "up" | "down" | "flat" | "insufficient";
+  latestScore: number | null;
+  bestScore: number | null;
+}
+
 interface DashboardData {
   stats: {
     totalInterviews: number;
@@ -38,23 +54,127 @@ interface DashboardData {
     avgCodingScore: number;
   };
   interviews: InterviewStat[];
+  candidateProfiles: CandidateProfile[];
 }
 
-function scoreColor(score: number) {
-  if (score >= 7) return "text-verified";
-  if (score >= 4) return "text-seal";
-  return "text-destructive";
-}
+function AttemptDetailToggle({ attempt }: { attempt: CandidateAttempt }) {
+  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<SessionDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
 
-function ScoreChip({ score, label }: { score: number; label?: string }) {
+  async function handleToggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && !detail && !loading) {
+      setLoading(true);
+      setDetailError("");
+      try {
+        const res = await fetch(`/api/session-detail/${attempt.sessionId}`);
+        const json = await res.json();
+        if (!res.ok) {
+          setDetailError(json.error || "Failed to load breakdown.");
+          return;
+        }
+        setDetail(json);
+      } catch {
+        setDetailError("Failed to reach the server.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
   return (
-    <span className="inline-flex items-center gap-1">
-      {label && <span className="label-mono text-muted-foreground">{label}</span>}
-      <span className={`font-mono text-sm font-medium ${scoreColor(score)}`}>
-        {score}
-        <span className="text-muted-foreground text-xs"> /10</span>
-      </span>
-    </span>
+    <div className="w-full">
+      <button
+        type="button"
+        onClick={handleToggle}
+        className="label-mono inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ChevronDown className={`h-3 w-3 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        {open ? "Hide breakdown" : "View breakdown"}
+      </button>
+
+      {open && (
+        <div className="mt-3 rounded-lg border border-border bg-card p-4 space-y-4">
+          {loading && <p className="text-sm text-muted-foreground">Loading breakdown...</p>}
+          {detailError && <p className="text-sm text-destructive">{detailError}</p>}
+
+          {detail && (
+            <>
+              {detail.overallFeedback && (
+                <div className="space-y-1">
+                  <p className="label-mono">Examiner&apos;s remarks</p>
+                  <p className="text-sm text-foreground">{detail.overallFeedback}</p>
+                </div>
+              )}
+
+              {detail.subjects.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="label-mono">Subject-wise marks</p>
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <SubjectDonut subjects={detail.subjects} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 flex-1">
+                      {detail.subjects.map((s) => (
+                        <SubjectStamp key={s.subject} subject={s.subject} average={s.average} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(detail.strengths.length > 0 || detail.improvements.length > 0) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {detail.strengths.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="label-mono text-verified">Noted strengths</p>
+                      <ul className="space-y-1">
+                        {detail.strengths.map((s, i) => (
+                          <li key={i} className="text-sm text-foreground flex gap-1.5">
+                            <span className="text-verified">·</span>
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {detail.improvements.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="label-mono text-seal">Flagged for improvement</p>
+                      <ul className="space-y-1">
+                        {detail.improvements.map((s, i) => (
+                          <li key={i} className="text-sm text-foreground flex gap-1.5">
+                            <span className="text-seal">·</span>
+                            {s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {detail.coding && (
+                <div className="space-y-1 border-t border-border pt-3">
+                  <p className="label-mono">Coding round</p>
+                  {detail.coding.questionTitle && (
+                    <p className="text-sm text-foreground">{detail.coding.questionTitle}</p>
+                  )}
+                  <p className="label-mono text-muted-foreground/60">
+                    {detail.coding.language || "—"} · {detail.coding.testsPassed ?? "—"}/
+                    {detail.coding.testsTotal ?? "—"} tests
+                  </p>
+                  {detail.coding.aiFeedback && (
+                    <p className="text-sm text-muted-foreground">{detail.coding.aiFeedback}</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -65,6 +185,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -163,8 +284,8 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-heading font-bold">
-                {data.stats.avgScore}
-                <span className="text-lg text-muted-foreground"> / 10</span>
+                {toDisplayScore(data.stats.avgScore)}
+                <span className="text-lg text-muted-foreground"> / 100</span>
               </p>
             </CardContent>
             <div className="seal-badge w-16 h-16 absolute -top-3 -right-3 opacity-15" />
@@ -175,12 +296,125 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-heading font-bold">
-                {data.stats.avgCodingScore}
-                <span className="text-lg text-muted-foreground"> / 10</span>
+                {toDisplayScore(data.stats.avgCodingScore)}
+                <span className="text-lg text-muted-foreground"> / 100</span>
               </p>
             </CardContent>
           </Card>
         </div>
+
+        {/* Candidate profiles — grouped by self-reported email across all interviews */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Candidate Profiles</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.candidateProfiles.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                No candidate emails captured yet — profiles appear once a candidate enters their email at the start of an interview.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {data.candidateProfiles.map((profile) => {
+                  const isOpen = expandedEmail === profile.email;
+                  const scores = profile.attempts
+                    .map((a) => a.overallScore)
+                    .filter((s): s is number => s !== null);
+
+                  return (
+                    <div
+                      key={profile.email}
+                      className="border border-border rounded-lg overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setExpandedEmail(isOpen ? null : profile.email)}
+                        className="w-full flex items-start justify-between gap-4 p-4 text-left hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-foreground font-medium">
+                            {profile.name || profile.email}
+                          </p>
+                          <p className="label-mono mt-1">
+                            {profile.email} · {profile.attempts.length} attempt
+                            {profile.attempts.length !== 1 ? "s" : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <Sparkline scores={scores} />
+                          <TrendBadge trend={profile.trend} />
+                          {profile.latestScore !== null && (
+                            <ScoreChip score={profile.latestScore} label="Latest" />
+                          )}
+                          <ChevronDown
+                            className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                              isOpen ? "rotate-180" : ""
+                            }`}
+                          />
+                        </div>
+                      </button>
+
+                      <div
+                        className={`grid transition-all duration-200 ease-in-out ${
+                          isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                        }`}
+                      >
+                        <div className="overflow-hidden">
+                          <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-4">
+                            {profile.attempts.length >= 2 && (
+                              <ScoreHistoryChart attempts={profile.attempts} />
+                            )}
+                            <div className="divide-y divide-border">
+                            {profile.attempts.map((a) => (
+                              <div
+                                key={a.sessionId}
+                                className="py-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2"
+                              >
+                                <div className="space-y-1">
+                                  <p className="text-sm text-foreground line-clamp-1">
+                                    {a.interviewTitle}
+                                  </p>
+                                  <p className="label-mono">
+                                    {new Date(a.createdAt).toLocaleString()}
+                                  </p>
+                                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                    {a.overallScore !== null ? (
+                                      <ScoreChip score={a.overallScore} label="Q&A" />
+                                    ) : (
+                                      <span className="label-mono text-muted-foreground/60">
+                                        Q&amp;A — not scored
+                                      </span>
+                                    )}
+                                    {a.coding && a.coding.aiScore !== null ? (
+                                      <ScoreChip score={a.coding.aiScore} label="Coding" />
+                                    ) : (
+                                      <span className="label-mono text-muted-foreground/60">
+                                        Coding — not attempted
+                                      </span>
+                                    )}
+                                  </div>
+                                  <AttemptDetailToggle attempt={a} />
+                                </div>
+                                <a
+                                  href={`/api/session-report/${a.sessionId}`}
+                                  className="inline-flex items-center gap-1.5 label-mono border border-border rounded-md px-3 py-1.5 shrink-0 hover:bg-muted transition-colors self-start sm:self-auto"
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  PDF Report
+                                </a>
+                              </div>
+                            ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Interviews — expandable candidate rows */}
         <Card>

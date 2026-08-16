@@ -2,6 +2,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { InterviewTypeCards } from "@/components/interview-type-cards";
+import { DomainCards } from "@/components/domain-cards";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { ChevronDown } from "lucide-react";
 
 const FAQS: { question: string; answer: string }[] = [
@@ -52,7 +54,7 @@ export default function Landing() {
     <main
       className="min-h-screen px-4 py-4 sm:py-10"
       style={{
-        backgroundImage: "radial-gradient(#E4E1D5 1px, transparent 1px)",
+        backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)",
         backgroundSize: "16px 16px",
       }}
     >
@@ -72,11 +74,14 @@ export default function Landing() {
           <span className="font-heading font-bold text-base text-foreground">
             AI interview practice booth
           </span>
-          <a href="/login">
-            <span className="label-mono border border-border rounded px-3 py-1.5">
-              Recruiter login
-            </span>
-          </a>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <a href="/login">
+              <span className="label-mono border border-border rounded px-3 py-1.5">
+                Recruiter login
+              </span>
+            </a>
+          </div>
         </div>
 
         {/* Hero */}
@@ -95,7 +100,7 @@ export default function Landing() {
               >
                 <path
                   d="M2 9 C 30 3, 60 13, 90 6 S 130 10, 148 5"
-                  stroke="#A63D40"
+                  stroke="var(--destructive)"
                   strokeWidth="2.5"
                   fill="none"
                   strokeLinecap="round"
@@ -130,6 +135,14 @@ export default function Landing() {
               <Button asChild size="sm" variant="outline">
                 <a href="/practice">Practice without a link →</a>
               </Button>
+              <div>
+                <a
+                  href="/candidate/dashboard"
+                  className="label-mono text-muted-foreground hover:text-foreground transition-colors inline-block mt-2"
+                >
+                  Track your progress →
+                </a>
+              </div>
             </div>
 
             <div className="ticket-divider relative">
@@ -168,7 +181,7 @@ export default function Landing() {
                 >
                   <path
                     d="M14 40 C 12 25, 25 10, 40 12"
-                    stroke="#A63D40"
+                    stroke="var(--destructive)"
                     strokeWidth="2"
                     fill="none"
                     strokeLinecap="round"
@@ -176,7 +189,7 @@ export default function Landing() {
                   />
                   <path
                     d="M40 12 L 46 15 M40 12 L 38 19"
-                    stroke="#A63D40"
+                    stroke="var(--destructive)"
                     strokeWidth="2"
                     fill="none"
                     strokeLinecap="round"
@@ -227,6 +240,38 @@ export default function Landing() {
 
         <div className="px-6 pt-6 pb-8">
           <InterviewTypeCards />
+        </div>
+      </div>
+
+      {/* Domain showcase — informational only, actual selection happens on /practice */}
+      <div className="mx-auto max-w-4xl w-full bg-background border border-border rounded-xl overflow-hidden mt-8">
+        <div className="flex gap-1.5 px-6 pt-2">
+          {Array.from({ length: 14 }).map((_, i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-background border border-border"
+            />
+          ))}
+        </div>
+
+        <div className="px-6 pt-6 pb-2 text-center">
+          <p className="label-mono text-seal mb-2">Pick your track</p>
+          <h2 className="text-2xl sm:text-3xl leading-tight mb-2">
+            Practice interviews by domain
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            From core software roles to specialized tracks — choose your domain
+            when you start practicing.
+          </p>
+        </div>
+
+        <div className="px-6 pt-6 pb-8">
+          <DomainCards mode="showcase" />
+          <div className="text-center mt-5">
+            <Button asChild size="sm" variant="outline">
+              <a href="/practice">Choose your domain →</a>
+            </Button>
+          </div>
         </div>
       </div>
 

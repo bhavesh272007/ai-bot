@@ -35,7 +35,7 @@ function CardInner({ type, selected }: { type: InterviewTypeDef; selected: boole
             key={tag}
             className="label-mono rounded-full px-2.5 py-1"
             style={{
-              backgroundColor: `${type.accent}1A`,
+              backgroundColor: `color-mix(in srgb, ${type.accent} 16%, transparent)`,
               color: type.accent,
             }}
           >

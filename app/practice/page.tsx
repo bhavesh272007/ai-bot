@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { InterviewTypeCards } from "@/components/interview-type-cards";
+import { DomainCards, type Domain } from "@/components/domain-cards";
 import { ResumeUpload } from "@/components/resume-upload";
 import { getInterviewType } from "@/lib/interview-types";
 
@@ -15,6 +16,7 @@ export default function Practice() {
   const router = useRouter();
 
   const [interviewType, setInterviewType] = useState<string | null>(null);
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
   const [level, setLevel] = useState<(typeof LEVELS)[number]>("Entry-level");
@@ -23,6 +25,15 @@ export default function Practice() {
   const [error, setError] = useState("");
 
   const canStart = !loading && role.trim().length >= 2 && !!interviewType;
+
+  function handleDomainSelect(domain: Domain) {
+    setSelectedDomainId(domain.id);
+    // Quick-fill only — the existing role input is what actually reaches
+    // generate-practice-questions, so this can't silently do nothing if
+    // that route doesn't separately handle a "domain" field. User can still
+    // edit the role text after picking a domain.
+    setRole(domain.label);
+  }
 
   async function handleStart() {
     if (!interviewType) {
@@ -57,7 +68,7 @@ export default function Practice() {
 
   return (
     <main className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
-      <Card className="max-w-2xl w-full overflow-hidden pt-0">
+      <Card className="max-w-4xl w-full overflow-hidden pt-0">
         <div className="flex gap-1.5 px-6 pt-4 pb-2">
           {Array.from({ length: 10 }).map((_, i) => (
             <div
@@ -89,23 +100,37 @@ export default function Practice() {
           </div>
 
           <div className="space-y-2">
-            <label className="label-mono">Target role</label>
-            <input
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              placeholder="e.g. Software Engineer, Data Analyst"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+            <label className="label-mono">Choose your domain</label>
+            <p className="text-sm text-muted-foreground/70">
+              Picks a starting point for your target role below — feel free to edit it after.
+            </p>
+            <DomainCards
+              mode="select"
+              selectedId={selectedDomainId}
+              onSelect={handleDomainSelect}
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="label-mono">Target company (optional)</label>
-            <input
-              value={company}
-              onChange={(e) => setCompany(e.target.value)}
-              placeholder="e.g. TCS, Infosys, or leave blank"
-              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-            />
+          <div className="grid sm:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="label-mono">Target role</label>
+              <input
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="e.g. Software Engineer, Data Analyst"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="label-mono">Target company (optional)</label>
+              <input
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="e.g. TCS, Infosys, or leave blank"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

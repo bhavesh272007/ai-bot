@@ -42,7 +42,7 @@ interface RubricAnswer {
 
 export async function POST(req: NextRequest) {
   try {
-    const { answers, interviewId } = await req.json();
+    const { answers, interviewId, candidateEmail, candidateName } = await req.json();
 
     if (!answers || !Array.isArray(answers) || answers.length === 0) {
       return Response.json(
@@ -120,7 +120,7 @@ Return ONLY a valid JSON object, no markdown formatting, no code fences, no extr
         score,
         strengths: a.strengths,
         improvements: a.improvements,
-        _category: category, // internal only, not persisted or returned
+        _category: category, // used for weighting; also persisted on session_answers below
       };
     });
 
@@ -153,11 +153,24 @@ Return ONLY a valid JSON object, no markdown formatting, no code fences, no extr
     // even though the insert's WITH CHECK passes fine on its own.
     const sessionId = randomUUID();
 
+    // Normalize server-side too — the frontend already validates/trims, but
+    // this route is a public POST endpoint, so don't trust that blindly.
+    const normalizedEmail =
+      typeof candidateEmail === "string" && candidateEmail.trim()
+        ? candidateEmail.trim().toLowerCase().slice(0, 254) // 254 = max valid email length
+        : null;
+    const normalizedName =
+      typeof candidateName === "string" && candidateName.trim()
+        ? candidateName.trim().slice(0, 200)
+        : null;
+
     const { error: sessionError } = await supabase.from("sessions").insert({
       id: sessionId,
       interview_id: interviewId || null,
       overall_score: result.overall_score,
       overall_feedback: result.overall_feedback,
+      candidate_email: normalizedEmail,
+      candidate_name: normalizedName,
     });
 
     if (sessionError) {
@@ -177,6 +190,7 @@ Return ONLY a valid JSON object, no markdown formatting, no code fences, no extr
         strengths: a.strengths,
         improvements: a.improvements,
         order_index: i,
+        category: answers[i]?.category || "Experience",
       })
     );
 

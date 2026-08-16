@@ -4,11 +4,18 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Mic, Volume2, VolumeX, RotateCcw, Loader2, AlertCircle } from "lucide-react";
 import { ResumeUpload } from "@/components/resume-upload";
+import { InterviewerAvatar } from "@/components/interviewer-avatar";
+import { CandidateCamera } from "@/components/candidate-camera";
+import { InterviewProgress } from "@/components/interview/InterviewProgress";
+import { useTextToSpeech } from "@/lib/voice/useTextToSpeech";
+import { useAudioLevel } from "@/lib/voice/useAudioLevel";
+import { toDisplayScore } from "@/lib/scoring";
 
 interface Question {
   category: string;
@@ -59,6 +66,25 @@ function scoreTextClass(score: number) {
   return "text-destructive";
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+// Ranks voices for the picker's default ordering — Indian English first
+// (this is where free browser TTS is actually strong, notably Edge's
+// neural "Neerja"/"Prabhat" voices), then other English, then the rest.
+function voiceRank(v: SpeechSynthesisVoice): number {
+  if (v.lang === "en-IN") return 0;
+  if (v.lang.startsWith("en")) return 1;
+  return 2;
+}
+
+function formatVoiceLabel(v: SpeechSynthesisVoice): string {
+  return `${v.name} (${v.lang})`;
+}
+
+const VOICE_PREFERENCE_KEY = "interview-booth-voice-name";
+
 export default function CandidateInterview() {
   const params = useParams();
   const interviewId = params.id as string;
@@ -68,6 +94,9 @@ export default function CandidateInterview() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentAnswer, setCurrentAnswer] = useState("");
   const [answers, setAnswers] = useState<Answer[]>([]);
+  // Index into `questions` the candidate is currently reviewing (view-only —
+  // navigator lets them glance back at a past answer, not edit it).
+  const [reviewingIndex, setReviewingIndex] = useState<number | null>(null);
 
   const [scoring, setScoring] = useState(false);
   const [scoreResult, setScoreResult] = useState<ScoreResult | null>(null);
@@ -79,6 +108,14 @@ export default function CandidateInterview() {
   const [targetCompany, setTargetCompany] = useState("");
   const [targetLevel, setTargetLevel] = useState("");
 
+  // ---------- Candidate identity (recruiter-shared interviews only) ----------
+  // Self-reported — lets the recruiter dashboard group multiple attempts by
+  // the same candidate and show a trend. Not collected in practice mode,
+  // since those sessions aren't tracked by any recruiter.
+  const [candidateName, setCandidateName] = useState("");
+  const [candidateEmail, setCandidateEmail] = useState("");
+  const [candidateEmailError, setCandidateEmailError] = useState("");
+
   // ---------- Resume personalization (recruiter-shared interviews only) ----------
   const [resumeText, setResumeText] = useState<string | null>(null);
   const [personalizing, setPersonalizing] = useState(false);
@@ -86,13 +123,30 @@ export default function CandidateInterview() {
 
   // ---------- Voice (STT + TTS) state ----------
   const [voiceSupported, setVoiceSupported] = useState(false);
-  const [micSupported, setMicSupported] = useState(false);
+  const [micSupported, setMicSupported] = useState(false); // native SpeechRecognition present
+  // True if we can capture voice at ALL, either via native recognition or
+  // via record+Whisper fallback. Gates whether the mic button shows.
+  const [voiceInputSupported, setVoiceInputSupported] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true); // auto-read questions aloud
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [cameraEnabled, setCameraEnabled] = useState(true); // self-view during the interview, never recorded
+  const [selectedVoiceName, setSelectedVoiceName] = useState("");
+  const tts = useTextToSpeech();
+  const audioLevel = useAudioLevel();
+  // Bumped once per TTS word boundary — drives the avatar's speaking pulse.
+  // See components/interviewer-avatar.tsx for why this isn't true lip sync.
+  const [speakTick, setSpeakTick] = useState(0);
   const [isListening, setIsListening] = useState(false);
+  // True while the CURRENT listening session is using record+Whisper
+  // instead of live native recognition (no interim transcript in this mode —
+  // the answer fills in only once recording stops and Whisper responds).
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
 
   const recognitionRef = useRef<any>(null);
   const baseAnswerRef = useRef(""); // committed transcript before the current listening session
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const activeStreamRef = useRef<MediaStream | null>(null);
 
   // ---------- Dynamic follow-up (Phase 13) state ----------
   const MAX_FOLLOWUPS = 3; // cap total follow-ups per interview (cost + pacing)
@@ -107,6 +161,47 @@ export default function CandidateInterview() {
   // question, or a follow-up probing the answer just given.
   const currentQuestion = activeFollowUp ?? questions[currentIndex];
 
+  // Pick a default voice once the browser reports its list — remembered
+  // choice first, otherwise the highest-ranked available (Indian English
+  // preferred, since that's where free browser TTS is strongest).
+  useEffect(() => {
+    if (!tts.isSupported || tts.voices.length === 0 || selectedVoiceName) return;
+
+    const saved = typeof window !== "undefined" ? localStorage.getItem(VOICE_PREFERENCE_KEY) : null;
+    if (saved && tts.voices.some((v) => v.name === saved)) {
+      setSelectedVoiceName(saved);
+      return;
+    }
+
+    const [best] = [...tts.voices].sort((a, b) => voiceRank(a) - voiceRank(b));
+    if (best) setSelectedVoiceName(best.name);
+  }, [tts.voices, tts.isSupported, selectedVoiceName]);
+
+  function handleVoiceChange(name: string) {
+    setSelectedVoiceName(name);
+    if (typeof window !== "undefined") localStorage.setItem(VOICE_PREFERENCE_KEY, name);
+    // Preview it immediately so picking from the dropdown gives instant feedback
+    if (currentQuestion && stage === "interview") {
+      tts.speak(currentQuestion.question, { voiceName: name, onBoundary: () => setSpeakTick((t) => t + 1) });
+    }
+  }
+
+  // Drive the avatar's real audio-reactive mouth off genuine mic amplitude
+  // while listening — separate from and additive to the existing
+  // SpeechRecognition/MediaRecorder logic, which is untouched.
+  useEffect(() => {
+    if (isListening) {
+      audioLevel.start().catch(() => {
+        // Best-effort only — if this second getUserMedia call fails for any
+        // reason, the avatar just falls back to a resting mouth. The actual
+        // answer-capture path (recognition/fallback) is unaffected either way.
+      });
+    } else {
+      audioLevel.stop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isListening]);
+
   // Feature-detect once on mount (must run client-side only)
   useEffect(() => {
     setVoiceSupported(typeof window !== "undefined" && "speechSynthesis" in window);
@@ -114,6 +209,13 @@ export default function CandidateInterview() {
       typeof window !== "undefined" &&
       ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
     setMicSupported(!!SpeechRecognitionCtor);
+    // Voice input is usable either through native recognition, or through
+    // plain mic capture + our Whisper fallback endpoint — so this is true
+    // for effectively every modern browser, including Firefox.
+    setVoiceInputSupported(
+      !!SpeechRecognitionCtor ||
+        (typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia)
+    );
   }, []);
 
   useEffect(() => {
@@ -148,68 +250,109 @@ export default function CandidateInterview() {
     if (stage !== "interview" || !voiceEnabled || !voiceSupported) return;
     if (!currentQuestion) return;
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(currentQuestion.question);
-    utterance.rate = 1;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    tts.speak(currentQuestion.question, {
+      rate: 1,
+      voiceName: selectedVoiceName || undefined,
+      onBoundary: () => setSpeakTick((t) => t + 1),
+    });
 
     return () => {
-      window.speechSynthesis.cancel();
+      tts.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, currentIndex, activeFollowUp, voiceEnabled, voiceSupported]);
+  }, [stage, currentIndex, activeFollowUp, voiceEnabled, voiceSupported, selectedVoiceName]);
 
-  // Stop any speech/recognition on unmount
+  // Stop any speech/recognition/recording on unmount
   useEffect(() => {
     return () => {
-      if (typeof window !== "undefined") window.speechSynthesis.cancel();
+      tts.cancel();
+      audioLevel.stop();
       recognitionRef.current?.stop();
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      activeStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function replayQuestion() {
     if (!voiceSupported || !currentQuestion) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(currentQuestion.question);
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    tts.speak(currentQuestion.question, {
+      voiceName: selectedVoiceName || undefined,
+      onBoundary: () => setSpeakTick((t) => t + 1),
+    });
   }
 
   function toggleVoiceEnabled() {
     if (voiceEnabled) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
+      tts.cancel();
     }
     setVoiceEnabled((v) => !v);
   }
 
-  // Phase 11: STT — mic button transcribes into the same textarea as typing
-  function toggleListening() {
-    if (!micSupported) return;
+  // Record raw audio and send it to our Groq Whisper fallback endpoint.
+  // Used for browsers with no native SpeechRecognition (e.g. Firefox), and
+  // as a mid-answer rescue if native recognition throws an error.
+  async function startFallbackRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      activeStreamRef.current = stream;
+      audioChunksRef.current = [];
 
-    if (isListening) {
-      recognitionRef.current?.stop();
-      return;
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
+      const recorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        setIsListening(false);
+        stream.getTracks().forEach((t) => t.stop());
+        activeStreamRef.current = null;
+
+        const blob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (blob.size < 1000) return; // essentially silence — nothing worth sending
+
+        setTranscribing(true);
+        try {
+          const formData = new FormData();
+          formData.append("audio", blob, `recording.${mimeType.includes("webm") ? "webm" : "mp4"}`);
+
+          const res = await fetch("/api/transcribe-fallback", { method: "POST", body: formData });
+          if (!res.ok) throw new Error("Transcription failed");
+
+          const data = await res.json();
+          const text = (data.text || "").trim();
+          if (text) {
+            setCurrentAnswer((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+          }
+        } catch (err) {
+          // Fail quietly — whatever the candidate already typed/said stays
+          // in the box, they can just keep typing or try the mic again.
+        } finally {
+          setTranscribing(false);
+        }
+      };
+
+      recorder.start();
+      setUsingFallback(true);
+      setIsListening(true);
+    } catch (err) {
+      // Mic permission denied or no device available — nothing more to do.
+      setIsListening(false);
     }
+  }
 
-    // Don't let the AI talk over the student
-    window.speechSynthesis.cancel();
-    setIsSpeaking(false);
-
+  function startNativeRecognition() {
     const SpeechRecognitionCtor =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = "en-US";
     recognition.continuous = true;
     recognition.interimResults = true;
-
-    // Keep whatever's already typed/transcribed and append to it
-    baseAnswerRef.current = currentAnswer ? currentAnswer.trim() + " " : "";
 
     recognition.onresult = (event: SpeechRecognitionEventLike) => {
       let interim = "";
@@ -228,19 +371,65 @@ export default function CandidateInterview() {
       setCurrentAnswer((baseAnswerRef.current + interim).trim());
     };
 
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (e: any) => {
+      if (e.error === "no-speech" || e.error === "aborted") {
+        setIsListening(false);
+        return;
+      }
+      // Something more disruptive (network drop, permission hiccup) —
+      // rescue the rest of THIS answer with record+Whisper instead of
+      // just dropping the candidate back to typing mid-sentence.
+      recognitionRef.current = null;
+      setIsListening(false);
+      startFallbackRecording();
+    };
+
+    recognition.onend = () => {
+      if (!usingFallback) setIsListening(false);
+    };
 
     recognitionRef.current = recognition;
+    setUsingFallback(false);
     recognition.start();
     setIsListening(true);
   }
 
-  function stopVoiceActivity() {
-    window.speechSynthesis.cancel();
-    setIsSpeaking(false);
+  // Phase 11: STT — mic button transcribes into the same textarea as typing.
+  // Prefers native SpeechRecognition (live, free, no round-trip); falls back
+  // to record+Whisper when native isn't available in this browser.
+  function toggleListening() {
+    if (!voiceInputSupported) return;
+
     if (isListening) {
-      recognitionRef.current?.stop();
+      if (usingFallback) {
+        mediaRecorderRef.current?.stop();
+      } else {
+        recognitionRef.current?.stop();
+      }
+      return;
+    }
+
+    // Don't let the AI talk over the student
+    tts.cancel();
+
+    // Keep whatever's already typed/transcribed and append to it
+    baseAnswerRef.current = currentAnswer ? currentAnswer.trim() + " " : "";
+
+    if (micSupported) {
+      startNativeRecognition();
+    } else {
+      startFallbackRecording();
+    }
+  }
+
+  function stopVoiceActivity() {
+    tts.cancel();
+    if (isListening) {
+      if (usingFallback) {
+        mediaRecorderRef.current?.stop();
+      } else {
+        recognitionRef.current?.stop();
+      }
     }
   }
 
@@ -250,6 +439,7 @@ export default function CandidateInterview() {
     setCurrentAnswer("");
     setActiveFollowUp(null);
     setFollowUpCount(0);
+    setReviewingIndex(null);
     setStage("interview");
   }
 
@@ -259,6 +449,15 @@ export default function CandidateInterview() {
   // (the recruiter's template) are never modified, so other candidates on
   // the same link are unaffected.
   async function handleBeginWithPersonalization() {
+    if (!isPractice) {
+      const trimmedEmail = candidateEmail.trim();
+      if (!trimmedEmail || !isValidEmail(trimmedEmail)) {
+        setCandidateEmailError("Enter a valid email — the recruiter uses it to track your attempts.");
+        return;
+      }
+      setCandidateEmailError("");
+    }
+
     if (!resumeText) {
       beginInterview();
       return;
@@ -296,6 +495,7 @@ export default function CandidateInterview() {
   }
 
   function advanceToNextMainQuestion(updatedAnswers: Answer[]) {
+    setReviewingIndex(null);
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -396,7 +596,12 @@ export default function CandidateInterview() {
       const res = await fetch("/api/score-interview", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: finalAnswers, interviewId }),
+        body: JSON.stringify({
+          answers: finalAnswers,
+          interviewId,
+          candidateEmail: isPractice ? null : candidateEmail.trim().toLowerCase() || null,
+          candidateName: isPractice ? null : candidateName.trim() || null,
+        }),
       });
 
       const data = await res.json();
@@ -478,6 +683,41 @@ export default function CandidateInterview() {
               each question in your own words — you&apos;ll get AI-scored feedback at the end.
               {isPractice && " This session isn't tracked by any recruiter."}
             </p>
+
+            {!isPractice && (
+              <div className="space-y-3">
+                <p className="label-mono">Candidate details</p>
+                <div className="space-y-2">
+                  <Input
+                    type="text"
+                    placeholder="Full name"
+                    value={candidateName}
+                    onChange={(e) => setCandidateName(e.target.value)}
+                    autoComplete="name"
+                  />
+                  <Input
+                    type="email"
+                    placeholder="Email address"
+                    value={candidateEmail}
+                    onChange={(e) => {
+                      setCandidateEmail(e.target.value);
+                      if (candidateEmailError) setCandidateEmailError("");
+                    }}
+                    autoComplete="email"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Used so the recruiter can match this attempt to you across multiple interviews. Never shown to other candidates.
+                </p>
+                {candidateEmailError && (
+                  <p className="flex items-center gap-1.5 text-sm text-destructive">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    {candidateEmailError}
+                  </p>
+                )}
+              </div>
+            )}
+
             {voiceSupported && (
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input
@@ -488,6 +728,40 @@ export default function CandidateInterview() {
                 />
                 Read questions aloud
               </label>
+            )}
+
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={cameraEnabled}
+                onChange={() => setCameraEnabled((v) => !v)}
+                className="h-4 w-4 accent-foreground"
+              />
+              Show my webcam during the interview (for a realistic feel — never recorded or stored)
+            </label>
+
+            {voiceSupported && voiceEnabled && tts.voices.length > 0 && (
+              <div className="space-y-1">
+                <label className="label-mono">Interviewer voice</label>
+                <select
+                  value={selectedVoiceName}
+                  onChange={(e) => handleVoiceChange(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
+                >
+                  {[...tts.voices]
+                    .filter((v) => v.lang.toLowerCase().startsWith("en"))
+                    .sort((a, b) => voiceRank(a) - voiceRank(b))
+                    .map((v) => (
+                      <option key={v.name} value={v.name}>
+                        {formatVoiceLabel(v)}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Available voices depend on your browser — Microsoft Edge offers natural-sounding
+                  Indian English voices at no cost. Other browsers may only offer a generic voice.
+                </p>
+              </div>
             )}
 
             {!isPractice && (
@@ -525,20 +799,70 @@ export default function CandidateInterview() {
   // ---------- INTERVIEW ----------
   if (stage === "interview") {
     const current = currentQuestion;
-    const progress = `Q${String(currentIndex + 1).padStart(2, "0")} / ${String(
-      questions.length
-    ).padStart(2, "0")}`;
 
     return (
       <main className="min-h-screen bg-background px-4 py-12">
         <div className="mx-auto max-w-2xl space-y-6">
           <div className="text-center space-y-1">
-            <p className="label-mono">
-              {progress}
-              {activeFollowUp && " · follow-up"}
-            </p>
             <h1 className="text-2xl">Interview in Progress</h1>
           </div>
+
+          <InterviewProgress
+            questions={questions}
+            currentIndex={currentIndex}
+            isFollowUp={!!activeFollowUp}
+            answers={answers}
+            onSelectReview={setReviewingIndex}
+          />
+
+          {reviewingIndex !== null && questions[reviewingIndex] && (
+            <Card className="border-seal">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <Badge
+                  variant="outline"
+                  className="w-fit border-seal text-seal font-mono text-xs"
+                >
+                  Reviewing Q{reviewingIndex + 1}
+                </Badge>
+                <button
+                  type="button"
+                  onClick={() => setReviewingIndex(null)}
+                  className="label-mono text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Close ✕
+                </button>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <p className="font-medium text-foreground">
+                  {questions[reviewingIndex].question}
+                </p>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {answers.find((a) => a.question === questions[reviewingIndex].question)
+                    ?.answer || "(not answered yet)"}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {(voiceSupported && voiceEnabled) || cameraEnabled ? (
+            <div className="flex justify-center items-stretch gap-4 flex-wrap">
+              {voiceSupported && voiceEnabled && (
+                <div
+                  className="rounded-md border border-border bg-muted flex flex-col items-center justify-center px-4"
+                  style={{ width: 240, height: 180 }}
+                >
+                  <InterviewerAvatar
+                    state={tts.isSpeaking ? "speaking" : isListening ? "listening" : "idle"}
+                    micLevel={audioLevel.level}
+                    speakTick={speakTick}
+                    surfaceClassName="fill-muted"
+                    size={110}
+                  />
+                </div>
+              )}
+              {cameraEnabled && <CandidateCamera autoStart width={240} height={180} />}
+            </div>
+          ) : null}
 
           <Card>
             <CardHeader>
@@ -559,7 +883,7 @@ export default function CandidateInterview() {
 
                 {voiceSupported && (
                   <div className="flex items-center gap-1">
-                    {isSpeaking && (
+                    {tts.isSpeaking && (
                       <span className="flex items-center gap-1 text-xs text-verified mr-1">
                         <span className="relative flex h-2 w-2">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-verified opacity-75" />
@@ -597,7 +921,7 @@ export default function CandidateInterview() {
               <div className="relative">
                 <Textarea
                   placeholder={
-                    micSupported
+                    voiceInputSupported
                       ? "Type your answer, or tap the mic to speak it..."
                       : "Type your answer here..."
                   }
@@ -606,12 +930,13 @@ export default function CandidateInterview() {
                   rows={6}
                   autoFocus
                 />
-                {micSupported && (
+                {voiceInputSupported && (
                   <button
                     type="button"
                     onClick={toggleListening}
+                    disabled={transcribing}
                     title={isListening ? "Stop recording" : "Answer by voice"}
-                    className={`absolute bottom-3 right-3 h-9 w-9 rounded-full flex items-center justify-center transition-colors ${
+                    className={`absolute bottom-3 right-3 h-9 w-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-50 ${
                       isListening
                         ? "bg-destructive text-background"
                         : "bg-foreground text-background hover:bg-foreground/80"
@@ -622,6 +947,8 @@ export default function CandidateInterview() {
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-60" />
                         <Mic className="h-4 w-4 relative" />
                       </span>
+                    ) : transcribing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <Mic className="h-4 w-4" />
                     )}
@@ -641,11 +968,17 @@ export default function CandidateInterview() {
                       }}
                     />
                   ))}
-                  <span className="label-mono text-destructive ml-2">Listening...</span>
+                  <span className="label-mono text-destructive ml-2">
+                    {usingFallback ? "Recording — tap mic again when done" : "Listening..."}
+                  </span>
                 </div>
               )}
 
-              {!micSupported && (
+              {transcribing && !isListening && (
+                <p className="label-mono text-center animate-pulse">Transcribing your answer...</p>
+              )}
+
+              {!voiceInputSupported && (
                 <p className="label-mono text-center">
                   Voice input isn&apos;t supported in this browser — please type your answer.
                 </p>
@@ -731,9 +1064,9 @@ export default function CandidateInterview() {
                   className="font-mono text-sm font-medium text-center leading-tight text-background"
                   style={{ transform: "rotate(8deg)" }}
                 >
-                  {scoreResult.overall_score}
+                  {toDisplayScore(scoreResult.overall_score)}
                   <br />
-                  <span className="text-[9px]">/10</span>
+                  <span className="text-[9px]">/100</span>
                 </span>
               </div>
             </Card>
@@ -751,8 +1084,8 @@ export default function CandidateInterview() {
                     <div className="flex items-center justify-between gap-4">
                       <p className="font-medium text-foreground">{a.question}</p>
                       <span className={`font-mono text-sm font-medium shrink-0 ${scoreTextClass(a.score)}`}>
-                        {a.score}
-                        <span className="text-muted-foreground text-xs"> /10</span>
+                        {toDisplayScore(a.score)}
+                        <span className="text-muted-foreground text-xs"> /100</span>
                       </span>
                     </div>
                     <p className="text-sm text-muted-foreground">

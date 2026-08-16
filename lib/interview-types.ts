@@ -12,7 +12,7 @@ export interface InterviewTypeDef {
   title: string;
   description: string;
   tags: string[];
-  accent: string; // hex, pulled from globals.css design tokens
+  accent: string; // CSS var() reference — resolves per-theme, not a static hex
   /** Server-side only: how this type should bias the Groq question mix. */
   promptFocus: string;
 }
@@ -25,7 +25,7 @@ export const INTERVIEW_TYPES: InterviewTypeDef[] = [
     description:
       "Master the STAR method with AI-generated behavioral questions on leadership, teamwork, conflict resolution, and problem-solving.",
     tags: ["STAR Method", "Leadership", "Teamwork", "Problem Solving"],
-    accent: "#14213D", // --foreground / ink
+    accent: "var(--foreground)", // tracks ink — light: #14213D, dark: #F3F1E9
     promptFocus:
       "6 Behavioral questions (STAR-method style, covering leadership, teamwork, conflict resolution, and problem-solving) and 2 Experience questions. Skip DSA entirely and include at most 1 CS Fundamentals question.",
   },
@@ -36,7 +36,7 @@ export const INTERVIEW_TYPES: InterviewTypeDef[] = [
     description:
       "Prepare for coding rounds, system design, and domain-specific technical assessments across software roles.",
     tags: ["Coding Rounds", "System Design", "Data Structures", "Algorithms"],
-    accent: "#2F6E51", // --verified
+    accent: "var(--verified)", // light: #2F6E51, dark: #4E9873
     promptFocus:
       "3 DSA questions, 3 CS Fundamentals questions (including at least one system-design-flavored question), 1 Experience question focused on technical project depth, and 1 Behavioral question.",
   },
@@ -47,7 +47,7 @@ export const INTERVIEW_TYPES: InterviewTypeDef[] = [
     description:
       "Practice common HR questions, salary negotiation, and situational judgment scenarios. Get feedback on tone and confidence.",
     tags: ["HR Questions", "Salary Negotiation", "Cultural Fit", "Strengths"],
-    accent: "#C89B3C", // --seal
+    accent: "var(--seal)", // #C89B3C — same value in both themes
     promptFocus:
       "6 Behavioral questions phrased as HR/situational scenarios (why should we hire you, salary expectations, cultural fit, strengths & weaknesses, situational judgment tests) and 2 Experience questions. Skip DSA entirely and include at most 1 CS Fundamentals question.",
   },
@@ -58,7 +58,7 @@ export const INTERVIEW_TYPES: InterviewTypeDef[] = [
     description:
       "Questions calibrated to real hiring patterns at IT services firms, banks, consulting firms, and startups.",
     tags: ["IT & Software", "Banking & Finance", "Consulting", "Startups"],
-    accent: "#A63D40", // --destructive
+    accent: "var(--destructive)", // light: #A63D40, dark: #C24A47
     promptFocus:
       "A balanced mix across all four categories (2 questions each), but calibrate every question's context, terminology, and difficulty specifically to the candidate's target company/industry rather than generic engineering-placement norms.",
   },

@@ -415,6 +415,15 @@ ${feedback}`;
                   PDF report unavailable — no session was linked for this run.
                 </p>
               )}
+
+              <div className="text-center">
+                <a
+                  href="/candidate/dashboard"
+                  className="label-mono text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Track your progress →
+                </a>
+              </div>
             </CardContent>
           </Card>
         </div>

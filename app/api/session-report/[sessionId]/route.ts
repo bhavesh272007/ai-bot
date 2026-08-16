@@ -9,6 +9,7 @@
 import { NextRequest } from "next/server";
 import { PDFDocument, StandardFonts, rgb, PDFFont, PDFPage } from "pdf-lib";
 import { supabase } from "@/lib/supabase";
+import { toDisplayScore } from "@/lib/scoring";
 
 // ---------- Theme colors (from globals.css) ----------
 const INK = hexToRgb("#14213D");
@@ -168,11 +169,14 @@ export async function GET(
       }
     }
 
+    // Badge width is fixed in points, so it needs to fit "100/100" (7 chars)
+    // rather than the old "10/10" (5 chars) — widened from 60 to 74 so the
+    // text doesn't run into the label beside it.
     function drawScoreBadge(score: number, label: string) {
       ensureSpace(30);
       const color = scoreColor(score);
-      page.drawRectangle({ x: MARGIN, y: y - 22, width: 60, height: 24, color, opacity: 1 });
-      page.drawText(`${score}/10`, {
+      page.drawRectangle({ x: MARGIN, y: y - 22, width: 74, height: 24, color, opacity: 1 });
+      page.drawText(`${toDisplayScore(score)}/100`, {
         x: MARGIN + 8,
         y: y - 15,
         size: 11,
@@ -180,7 +184,7 @@ export async function GET(
         color: PAPER,
       });
       page.drawText(label, {
-        x: MARGIN + 70,
+        x: MARGIN + 84,
         y: y - 15,
         size: 10,
         font: fontRegular,
@@ -223,7 +227,7 @@ export async function GET(
         ensureSpace(20);
         drawParagraph(a.question_text, { size: 10, font: fontBold, lineHeight: 14 });
         if (a.score !== null) {
-          drawParagraph(`Score: ${a.score}/10`, {
+          drawParagraph(`Score: ${toDisplayScore(Number(a.score))}/100`, {
             size: 9,
             font: fontMono,
             color: scoreColor(Number(a.score)),
