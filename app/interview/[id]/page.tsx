@@ -16,6 +16,7 @@ import { InterviewProgress } from "@/components/interview/InterviewProgress";
 import { useTextToSpeech } from "@/lib/voice/useTextToSpeech";
 import { useAudioLevel } from "@/lib/voice/useAudioLevel";
 import { toDisplayScore } from "@/lib/scoring";
+import { getInterviewerRole, PANEL_ROLE_LABELS, type InterviewerRole } from "@/lib/panel-mode";
 
 interface Question {
   category: string;
@@ -107,6 +108,13 @@ export default function CandidateInterview() {
   const [targetRole, setTargetRole] = useState("");
   const [targetCompany, setTargetCompany] = useState("");
   const [targetLevel, setTargetLevel] = useState("");
+  // Set only for practice-mode interviews (candidate picks it on /practice).
+  // Recruiter-shared interviews leave this null, and generate-followup /
+  // score-interview both fall back to a neutral default when it's absent.
+  const [interviewerPersonality, setInterviewerPersonality] = useState<string | null>(null);
+  // Opt-in panel mode (two alternating interviewers) — set from the
+  // interview's is_panel_mode column, practice-mode only.
+  const [isPanelMode, setIsPanelMode] = useState(false);
 
   // ---------- Candidate identity (recruiter-shared interviews only) ----------
   // Self-reported — lets the recruiter dashboard group multiple attempts by
@@ -160,6 +168,12 @@ export default function CandidateInterview() {
   // The question actually being shown right now — either the next scripted
   // question, or a follow-up probing the answer just given.
   const currentQuestion = activeFollowUp ?? questions[currentIndex];
+  // Panel mode: which of the two interviewers "owns" the current question.
+  // Follow-ups inherit their parent question's category (see handleNext),
+  // so a technical follow-up always stays with the technical interviewer.
+  const activeRole: InterviewerRole = currentQuestion
+    ? getInterviewerRole(currentQuestion.category)
+    : "technical";
 
   // Pick a default voice once the browser reports its list — remembered
   // choice first, otherwise the highest-ranked available (Indian English
@@ -234,6 +248,8 @@ export default function CandidateInterview() {
         setTargetRole(data.targetRole || "");
         setTargetCompany(data.targetCompany || "");
         setTargetLevel(data.targetLevel || "");
+        setInterviewerPersonality(data.interviewerPersonality || null);
+        setIsPanelMode(!!data.isPanelMode);
         setStage("intro");
       } catch (err) {
         setStage("notfound");
@@ -538,6 +554,7 @@ export default function CandidateInterview() {
             category: currentQuestion.category,
             question: currentQuestion.question,
             answer: updatedAnswers[updatedAnswers.length - 1].answer,
+            interviewerPersonality,
           }),
         });
         const data = await res.json();
@@ -601,6 +618,7 @@ export default function CandidateInterview() {
           interviewId,
           candidateEmail: isPractice ? null : candidateEmail.trim().toLowerCase() || null,
           candidateName: isPractice ? null : candidateName.trim() || null,
+          interviewerPersonality,
         }),
       });
 
@@ -675,6 +693,7 @@ export default function CandidateInterview() {
                 {targetRole}
                 {targetCompany && ` · ${targetCompany}`}
                 {targetLevel && ` · ${targetLevel}`}
+                {isPanelMode && " · Panel mode"}
               </p>
             )}
             <p className="text-muted-foreground">
@@ -847,18 +866,52 @@ export default function CandidateInterview() {
           {(voiceSupported && voiceEnabled) || cameraEnabled ? (
             <div className="flex justify-center items-stretch gap-4 flex-wrap">
               {voiceSupported && voiceEnabled && (
-                <div
-                  className="rounded-md border border-border bg-muted flex flex-col items-center justify-center px-4"
-                  style={{ width: 240, height: 180 }}
-                >
-                  <InterviewerAvatar
-                    state={tts.isSpeaking ? "speaking" : isListening ? "listening" : "idle"}
-                    micLevel={audioLevel.level}
-                    speakTick={speakTick}
-                    surfaceClassName="fill-muted"
-                    size={110}
-                  />
-                </div>
+                isPanelMode ? (
+                  <div className="flex gap-3">
+                    {(["technical", "behavioral"] as InterviewerRole[]).map((role) => {
+                      const isActive = role === activeRole;
+                      return (
+                        <div
+                          key={role}
+                          className={`rounded-md border flex flex-col items-center justify-center px-3 py-2 transition-all duration-300 ${
+                            isActive
+                              ? "border-seal bg-muted opacity-100 scale-100"
+                              : "border-border bg-muted/40 opacity-50 scale-95"
+                          }`}
+                          style={{ width: 150, height: 190 }}
+                        >
+                          <InterviewerAvatar
+                            state={isActive ? (tts.isSpeaking ? "speaking" : isListening ? "listening" : "idle") : "idle"}
+                            micLevel={isActive ? audioLevel.level : 0}
+                            speakTick={isActive ? speakTick : 0}
+                            surfaceClassName={isActive ? "fill-muted" : "fill-muted/40"}
+                            size={80}
+                          />
+                          <p
+                            className={`label-mono mt-1 text-center leading-tight ${
+                              isActive ? "text-seal" : "text-muted-foreground/50"
+                            }`}
+                          >
+                            {PANEL_ROLE_LABELS[role]}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div
+                    className="rounded-md border border-border bg-muted flex flex-col items-center justify-center px-4"
+                    style={{ width: 240, height: 180 }}
+                  >
+                    <InterviewerAvatar
+                      state={tts.isSpeaking ? "speaking" : isListening ? "listening" : "idle"}
+                      micLevel={audioLevel.level}
+                      speakTick={speakTick}
+                      surfaceClassName="fill-muted"
+                      size={110}
+                    />
+                  </div>
+                )
               )}
               {cameraEnabled && <CandidateCamera autoStart width={240} height={180} />}
             </div>
@@ -871,6 +924,11 @@ export default function CandidateInterview() {
                   <Badge variant="secondary" className="w-fit font-mono text-xs">
                     {current.category}
                   </Badge>
+                  {isPanelMode && (
+                    <Badge variant="outline" className="w-fit border-seal text-seal font-mono text-xs">
+                      {PANEL_ROLE_LABELS[activeRole]}
+                    </Badge>
+                  )}
                   {activeFollowUp && (
                     <Badge
                       variant="outline"

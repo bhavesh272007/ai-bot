@@ -5,6 +5,8 @@ import { InterviewTypeCards } from "@/components/interview-type-cards";
 import { DomainCards } from "@/components/domain-cards";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ChevronDown } from "lucide-react";
+import { INTERVIEWER_PERSONALITIES } from "@/lib/interviewer-personalities";
+import { CompanyCards, COMPANIES } from "@/components/company-cards";
 
 const FAQS: { question: string; answer: string }[] = [
   {
@@ -48,6 +50,16 @@ const FAQS: { question: string; answer: string }[] = [
       "A recruiter pastes a job description, AI generates tailored questions, and they get a shareable link. Candidates open the link and answer directly — no account needed on the candidate's end.",
   },
 ];
+
+// Color-codes each personality using tokens already in the design system
+// (verified / seal / destructive) rather than introducing new hex values —
+// keeps this section clean of hardcoded colors ahead of the Grind Mode
+// token migration.
+const PERSONALITY_ACCENT: Record<string, { border: string; text: string; dot: string }> = {
+  strict_panel: { border: "border-destructive/40", text: "text-destructive", dot: "bg-destructive" },
+  friendly_hr: { border: "border-verified/40", text: "text-verified", dot: "bg-verified" },
+  rapid_fire_technical: { border: "border-seal/40", text: "text-seal", dot: "bg-seal" },
+};
 
 export default function Landing() {
   return (
@@ -217,7 +229,10 @@ export default function Landing() {
       </div>
 
       {/* Interview types showcase — informational only, not clickable */}
-      <div className="mx-auto max-w-4xl w-full bg-background border border-border rounded-xl overflow-hidden mt-8">
+      <div
+        id="what-we-cover"
+        className="mx-auto max-w-4xl w-full bg-background border border-border rounded-xl overflow-hidden mt-8 scroll-mt-24"
+      >
         <div className="flex gap-1.5 px-6 pt-2">
           {Array.from({ length: 14 }).map((_, i) => (
             <div
@@ -275,8 +290,113 @@ export default function Landing() {
         </div>
       </div>
 
+      {/* Interviewer personality showcase — informational only, actual
+          selection happens on /practice. Highlighted with a rotated
+          seal-style "NEW" stamp, same visual language as the hero's
+          score stamp, since this is the newest feature on the site. */}
+      <div className="mx-auto max-w-4xl w-full bg-background border border-border rounded-xl overflow-hidden mt-8">
+        <div className="flex gap-1.5 px-6 pt-2">
+          {Array.from({ length: 14 }).map((_, i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-background border border-border"
+            />
+          ))}
+        </div>
+
+        <div className="relative px-6 pt-6 pb-2 text-center">
+          <p className="label-mono text-seal mb-2">Set the tone</p>
+          <h2 className="text-2xl sm:text-3xl leading-tight mb-2">
+            Choose your interviewer's personality
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            The same questions, three different examiners — pick who grills you
+            before you start.
+          </p>
+
+          {/* Rotated seal stamp, matching the hero's score-stamp motif */}
+          <div className="hidden sm:block absolute top-4 right-6 w-16 h-16">
+            <div className="seal-badge w-16 h-16 flex items-center justify-center">
+              <span
+                className="font-mono text-[11px] font-bold text-center leading-tight"
+                style={{ color: "#412402", transform: "rotate(-8deg)" }}
+              >
+                NEW
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 pt-6 pb-8">
+          <div className="grid sm:grid-cols-3 gap-3">
+            {INTERVIEWER_PERSONALITIES.map((p) => {
+              const accent = PERSONALITY_ACCENT[p.id] ?? {
+                border: "border-border",
+                text: "text-foreground",
+                dot: "bg-foreground",
+              };
+              return (
+                <Card key={p.id} className={`${accent.border} transition-colors`}>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${accent.dot}`} />
+                      <CardTitle className={`text-base ${accent.text}`}>{p.title}</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">{p.description}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+          <div className="text-center mt-5">
+            <Button asChild size="sm" variant="outline">
+              <a href="/practice">Pick your interviewer →</a>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Prep packs showcase — informational only, actual browsing happens
+          on /prep-packs. Shows all COMPANIES, same "full list in showcase
+          mode" pattern as the domain section above. */}
+      <div className="mx-auto max-w-4xl w-full bg-background border border-border rounded-xl overflow-hidden mt-8">
+        <div className="flex gap-1.5 px-6 pt-2">
+          {Array.from({ length: 14 }).map((_, i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-background border border-border"
+            />
+          ))}
+        </div>
+
+        <div className="px-6 pt-6 pb-2 text-center">
+          <p className="label-mono text-seal mb-2">Target a company</p>
+          <h2 className="text-2xl sm:text-3xl leading-tight mb-2">
+            Company-specific prep packs
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto">
+            Practice sets styled after common campus recruiters — some curated
+            from real interview experience, others AI-generated in that company's typical style.
+          </p>
+        </div>
+
+        <div className="px-6 pt-6 pb-8">
+          <CompanyCards mode="showcase" />
+          <div className="text-center mt-5">
+            <Button asChild size="sm" variant="outline">
+              <a href="/prep-packs">Browse prep packs →</a>
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* FAQ — hover to reveal, no click needed */}
-      <div className="mx-auto max-w-3xl w-full bg-background border border-border rounded-xl overflow-hidden mt-8">
+      <div
+        id="faq"
+        className="mx-auto max-w-3xl w-full bg-background border border-border rounded-xl overflow-hidden mt-8 scroll-mt-24"
+      >
         <div className="flex gap-1.5 px-6 pt-2">
           {Array.from({ length: 12 }).map((_, i) => (
             <div

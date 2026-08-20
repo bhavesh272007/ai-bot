@@ -33,13 +33,31 @@ function scoreColor(score: number) {
   return DESTRUCTIVE;
 }
 
+// pdf-lib's standard fonts (Helvetica, Courier, etc.) use WinAnsi encoding,
+// which only covers a Latin-1-ish character set. AI-generated text (from Groq)
+// can contain "smart" Unicode punctuation — non-breaking hyphens, curly quotes,
+// em dashes, ellipsis, bullets — that WinAnsi can't encode, and pdf-lib throws
+// instead of skipping the character. Normalize before anything reaches drawText.
+function sanitizeForPdf(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, "-") // hyphens/dashes incl. non-breaking hyphen
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'") // curly single quotes
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"') // curly double quotes
+    .replace(/\u2026/g, "...") // ellipsis
+    .replace(/[\u2022\u25CF\u25AA]/g, "-") // bullet variants
+    .replace(/\u00A0/g, " ") // non-breaking space
+    .replace(/[^\x00-\xFF]/g, "?"); // anything else outside WinAnsi/Latin-1 range — fallback so we never crash
+}
+
 const PAGE_WIDTH = 595.28; // A4
 const PAGE_HEIGHT = 841.89;
 const MARGIN = 50;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = (text || "").split(/\s+/).filter(Boolean);
+  const clean = sanitizeForPdf(text);
+  const words = clean.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = "";
 
@@ -133,7 +151,7 @@ export async function GET(
 
     function drawLabel(text: string) {
       ensureSpace(16);
-      page.drawText(text.toUpperCase(), {
+      page.drawText(sanitizeForPdf(text).toUpperCase(), {
         x: MARGIN,
         y,
         size: 8,
@@ -145,7 +163,7 @@ export async function GET(
 
     function drawHeading(text: string) {
       ensureSpace(24);
-      page.drawText(text, { x: MARGIN, y, size: 14, font: fontBold, color: INK });
+      page.drawText(sanitizeForPdf(text), { x: MARGIN, y, size: 14, font: fontBold, color: INK });
       y -= 10;
       page.drawLine({
         start: { x: MARGIN, y },
@@ -161,7 +179,7 @@ export async function GET(
       const color = opts?.color ?? INK;
       const font = opts?.font ?? fontRegular;
       const lineHeight = opts?.lineHeight ?? 14;
-      const lines = wrapText(text, font, size, CONTENT_WIDTH);
+      const lines = wrapText(text, font, size, CONTENT_WIDTH); // wrapText sanitizes internally
       for (const line of lines) {
         ensureSpace(lineHeight);
         page.drawText(line, { x: MARGIN, y, size, font, color });
@@ -183,7 +201,7 @@ export async function GET(
         font: fontBold,
         color: PAPER,
       });
-      page.drawText(label, {
+      page.drawText(sanitizeForPdf(label), {
         x: MARGIN + 84,
         y: y - 15,
         size: 10,

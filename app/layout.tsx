@@ -5,6 +5,7 @@ import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono, Caveat } from "next/font/g
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/lib/theme-provider";
+import SiteHeader from "@/components/site-header";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -60,6 +61,7 @@ export default function RootLayout({
       className={cn(
         "h-full",
         "antialiased",
+        "scroll-smooth",
         spaceGrotesk.variable,
         plexSans.variable,
         plexMono.variable,
@@ -75,7 +77,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <SiteHeader />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

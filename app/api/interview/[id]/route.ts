@@ -1,3 +1,4 @@
+// TARGET PATH: app/api/interview/[id]/route.ts
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
 
@@ -33,6 +34,8 @@ export async function GET(
     targetRole: interview.target_role || null,
     targetCompany: interview.target_company || null,
     targetLevel: interview.target_level || null,
+    interviewerPersonality: interview.interviewer_personality || null,
+    isPanelMode: interview.is_panel_mode || false,
     questions: questions.map((q) => ({
       category: q.category,
       question: q.question,

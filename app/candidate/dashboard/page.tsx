@@ -10,12 +10,14 @@ import {
   ScoreChip,
   Sparkline,
   TrendBadge,
+  StreakBadge,
   SubjectStamp,
   SubjectDonut,
   ScoreHistoryChart,
   type CandidateAttempt,
   type SessionDetail,
   type Trend,
+  type StreakData,
 } from "@/components/dashboard/charts";
 
 // Raw shape returned by /api/candidate-history (mirrors get_candidate_history()).
@@ -175,6 +177,7 @@ export default function CandidateDashboard() {
   const [emailError, setEmailError] = useState("");
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const [rows, setRows] = useState<CandidateHistoryRow[] | null>(null);
+  const [streak, setStreak] = useState<StreakData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -189,20 +192,32 @@ export default function CandidateDashboard() {
     setError("");
 
     try {
-      const res = await fetch("/api/candidate-history", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed }),
-      });
-      const json = await res.json();
+      const [historyRes, streakRes] = await Promise.all([
+        fetch("/api/candidate-history", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: trimmed }),
+        }),
+        fetch("/api/candidate-streak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: trimmed }),
+        }),
+      ]);
 
-      if (!res.ok) {
-        setError(json.error || "Couldn't load your history.");
+      const historyJson = await historyRes.json();
+      if (!historyRes.ok) {
+        setError(historyJson.error || "Couldn't load your history.");
         return;
       }
 
-      setRows(json.sessions ?? []);
+      setRows(historyJson.sessions ?? []);
       setSubmittedEmail(trimmed);
+
+      // Streak is a nice-to-have — don't fail the whole lookup if it errors.
+      if (streakRes.ok) {
+        setStreak(await streakRes.json());
+      }
     } catch {
       setError("Failed to reach the server.");
     } finally {
@@ -279,6 +294,7 @@ export default function CandidateDashboard() {
             onClick={() => {
               setSubmittedEmail(null);
               setRows(null);
+              setStreak(null);
               setEmail("");
             }}
             className="label-mono text-muted-foreground hover:text-foreground transition-colors"
@@ -326,6 +342,17 @@ export default function CandidateDashboard() {
                   <TrendBadge trend={trend} />
                 </CardContent>
               </Card>
+
+              {streak && (
+                <Card className="col-span-2 sm:col-span-3">
+                  <CardHeader>
+                    <CardTitle className="label-mono font-normal">Consistency</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <StreakBadge streak={streak} />
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {attempts.length >= 2 && (

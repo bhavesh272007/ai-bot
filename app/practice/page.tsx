@@ -9,6 +9,7 @@ import { InterviewTypeCards } from "@/components/interview-type-cards";
 import { DomainCards, type Domain } from "@/components/domain-cards";
 import { ResumeUpload } from "@/components/resume-upload";
 import { getInterviewType } from "@/lib/interview-types";
+import { INTERVIEWER_PERSONALITIES } from "@/lib/interviewer-personalities";
 
 const LEVELS = ["Internship", "Entry-level", "Experienced"] as const;
 
@@ -20,6 +21,12 @@ export default function Practice() {
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
   const [level, setLevel] = useState<(typeof LEVELS)[number]>("Entry-level");
+  // Defaults to Friendly HR — same "sensible default, no forced choice" pattern
+  // as Experience Level above. Candidate can change it before starting.
+  const [interviewerPersonality, setInterviewerPersonality] = useState<string>("friendly_hr");
+  // Opt-in only — off by default. Two AI interviewers (technical +
+  // behavioral) alternate questions instead of one. Practice mode only.
+  const [panelMode, setPanelMode] = useState(false);
   const [resumeText, setResumeText] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -48,7 +55,15 @@ export default function Practice() {
       const res = await fetch("/api/generate-practice-questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, company, level, interviewType, resumeText }),
+        body: JSON.stringify({
+          role,
+          company,
+          level,
+          interviewType,
+          resumeText,
+          interviewerPersonality,
+          panelMode,
+        }),
       });
 
       const data = await res.json();
@@ -151,6 +166,58 @@ export default function Practice() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="label-mono">Interviewer personality</label>
+            <p className="text-sm text-muted-foreground/70">
+              Shapes the tone of follow-up questions and how strictly your answers are scored.
+            </p>
+            <div className="grid sm:grid-cols-3 gap-2">
+              {INTERVIEWER_PERSONALITIES.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setInterviewerPersonality(p.id)}
+                  className={`text-left rounded-md border px-3 py-2 transition-colors ${
+                    interviewerPersonality === p.id
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <p className="text-sm font-medium">{p.title}</p>
+                  <p
+                    className={`text-xs mt-0.5 ${
+                      interviewerPersonality === p.id ? "text-background/70" : "text-muted-foreground/70"
+                    }`}
+                  >
+                    {p.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={panelMode}
+                onChange={(e) => setPanelMode(e.target.checked)}
+                className="h-4 w-4 accent-foreground"
+              />
+              <span className="label-mono">Panel interview (2 interviewers)</span>
+            </label>
+            <p className="text-sm text-muted-foreground/70 pl-6">
+              A technical and a behavioral interviewer alternate questions in the same session,
+              instead of one interviewer asking everything.
+              {panelMode && (
+                <span className="block mt-1">
+                  Note: the question mix will be balanced across categories while this is on, so
+                  both interviewers get a turn — your Interview Type selection above won't skew it.
+                </span>
+              )}
+            </p>
           </div>
 
           <ResumeUpload

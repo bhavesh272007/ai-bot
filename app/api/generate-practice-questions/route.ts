@@ -3,12 +3,13 @@ import Groq from "groq-sdk";
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getInterviewType } from "@/lib/interview-types";
+import { getInterviewerPersonality } from "@/lib/interviewer-personalities";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
-    const { role, company, level, interviewType, resumeText } = await req.json();
+    const { role, company, level, interviewType, resumeText, interviewerPersonality, panelMode } = await req.json();
 
     if (!role || !role.trim()) {
       return Response.json({ error: "Please enter a target role." }, { status: 400 });
@@ -16,10 +17,23 @@ export async function POST(req: NextRequest) {
 
     const levelLabel = level || "Entry-level";
     const typeDef = getInterviewType(interviewType);
+    // Silently falls back to null rather than erroring on an unrecognized
+    // id — question generation itself doesn't depend on personality, only
+    // the later follow-up/scoring calls do.
+    const personalityDef = getInterviewerPersonality(interviewerPersonality);
 
-    const questionMix =
-      typeDef?.promptFocus ||
+    const balancedMix =
       "A balanced mix: 2-3 CS Fundamentals, 1-2 DSA, 2 Experience, and 2 Behavioral questions.";
+
+    // Panel mode needs BOTH interviewer roles to actually get questions —
+    // technical (CS Fundamentals/DSA) and behavioral (Experience/Behavioral).
+    // An interview-type focus like "Behavioral" would otherwise starve the
+    // technical interviewer entirely (near-zero CS Fundamentals/DSA
+    // questions generated), leaving that avatar dimmed the whole session.
+    // Panel mode's category mix intentionally overrides the interview type
+    // selection for this reason — the type is still used for its title/
+    // framing, just not its category weighting, while panel mode is on.
+    const questionMix = panelMode ? balancedMix : typeDef?.promptFocus || balancedMix;
 
     // Resume text (if provided) is used only for this single generation call
     // — it is never written to the database, here or anywhere downstream.
@@ -58,7 +72,7 @@ Return ONLY a valid JSON array, with no markdown formatting, no code fences, and
 [{"category": "CS Fundamentals", "question": "..."}]`;
 
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.7,
     });
@@ -79,7 +93,9 @@ Return ONLY a valid JSON array, with no markdown formatting, no code fences, and
 
     const summary = `Self-practice: ${role}${
       company && company.trim() ? ` @ ${company}` : ""
-    } (${levelLabel})${typeDef ? ` · ${typeDef.title}` : ""}${resumeText ? " · resume-personalized" : ""}`;
+    } (${levelLabel})${typeDef ? ` · ${typeDef.title}` : ""}${resumeText ? " · resume-personalized" : ""}${
+      personalityDef ? ` · ${personalityDef.title} interviewer` : ""
+    }${panelMode ? " · panel mode" : ""}`;
 
     const { data: interview, error: interviewError } = await supabase
       .from("interviews")
@@ -90,6 +106,8 @@ Return ONLY a valid JSON array, with no markdown formatting, no code fences, and
         target_role: role,
         target_company: company && company.trim() ? company : null,
         target_level: levelLabel,
+        interviewer_personality: personalityDef?.id || null,
+        is_panel_mode: !!panelMode,
       })
       .select()
       .single();

@@ -3,6 +3,7 @@ import Groq from "groq-sdk";
 import { NextRequest } from "next/server";
 import { randomUUID } from "crypto";
 import { supabase } from "@/lib/supabase";
+import { getInterviewerPersonality } from "@/lib/interviewer-personalities";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -25,6 +26,10 @@ function categoryWeight(category: string): number {
 // Blend the three rubric sub-scores into one answer score. Correctness
 // dominates heavily since technical accuracy matters most in a placement
 // interview — a wrong answer shouldn't score well just for being articulate.
+// NOTE: personality nudges how the MODEL applies correctness/clarity/depth
+// (see scoringDirective below) — this blend formula and the category
+// weights above never change. Stored/rubric math stays identical regardless
+// of interviewer personality, per project convention.
 function blendAnswerScore(correctness: number, clarity: number, depth: number): number {
   const raw = correctness * 0.7 + depth * 0.2 + clarity * 0.1;
   const clamped = Math.max(0, Math.min(10, raw));
@@ -42,7 +47,7 @@ interface RubricAnswer {
 
 export async function POST(req: NextRequest) {
   try {
-    const { answers, interviewId, candidateEmail, candidateName } = await req.json();
+    const { answers, interviewId, candidateEmail, candidateName, interviewerPersonality } = await req.json();
 
     if (!answers || !Array.isArray(answers) || answers.length === 0) {
       return Response.json(
@@ -58,8 +63,13 @@ export async function POST(req: NextRequest) {
       )
       .join("\n\n");
 
-    const prompt = `You are an expert technical interviewer evaluating a candidate's performance in an engineering placement interview in India.
+    const personalityDef = getInterviewerPersonality(interviewerPersonality);
+    const scoringDirectiveBlock = personalityDef
+      ? `\nInterviewer personality for this session: ${personalityDef.title}. ${personalityDef.scoringDirective}\n`
+      : "";
 
+    const prompt = `You are an expert technical interviewer evaluating a candidate's performance in an engineering placement interview in India.
+${scoringDirectiveBlock}
 Below are the interview questions and the candidate's answers. Evaluate each answer individually against a fixed rubric, then give a qualitative overall impression.
 
 For EACH answer, score three separate criteria, each out of 10:
@@ -88,7 +98,7 @@ Return ONLY a valid JSON object, no markdown formatting, no code fences, no extr
 }`;
 
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
     });

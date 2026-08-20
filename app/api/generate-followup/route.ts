@@ -1,11 +1,13 @@
+// TARGET PATH: app/api/generate-followup/route.ts
 import Groq from "groq-sdk";
 import { NextRequest } from "next/server";
+import { getInterviewerPersonality } from "@/lib/interviewer-personalities";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
-    const { category, question, answer } = await req.json();
+    const { category, question, answer, interviewerPersonality } = await req.json();
 
     if (!question || !answer) {
       return Response.json({ followUp: null });
@@ -17,7 +19,14 @@ export async function POST(req: NextRequest) {
       return Response.json({ followUp: null });
     }
 
-    const prompt = `You are an interviewer conducting a live technical placement interview in India.
+    const personalityDef = getInterviewerPersonality(interviewerPersonality);
+    // Neutral default tone when no personality is set — e.g. recruiter-shared
+    // interviews, which don't currently expose this picker to the candidate.
+    const toneDirective =
+      personalityDef?.toneDirective ||
+      "You are an interviewer conducting a live technical placement interview.";
+
+    const prompt = `${toneDirective}
 
 You just asked this ${category} question:
 "${question}"
@@ -33,7 +42,7 @@ or
 {"needsFollowUp": false, "followUpQuestion": null}`;
 
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.5,
     });

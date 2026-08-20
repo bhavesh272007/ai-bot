@@ -1,7 +1,7 @@
 // TARGET PATH: components/dashboard/charts.tsx
 "use client";
 
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Flame } from "lucide-react";
 import { toDisplayScore } from "@/lib/scoring";
 
 // Extracted from app/dashboard/page.tsx (recruiter dashboard) so the
@@ -48,6 +48,13 @@ export interface SessionDetail {
 }
 
 export type Trend = "up" | "down" | "flat" | "insufficient";
+
+// Shape returned by the get_candidate_streak() SECURITY DEFINER function.
+export interface StreakData {
+  current_streak: number;
+  longest_streak: number;
+  days_this_week: number;
+}
 
 export function scoreColor(score: number) {
   if (score >= 7) return "text-verified";
@@ -252,6 +259,33 @@ export function TrendBadge({ trend }: { trend: Trend }) {
     <span className={`inline-flex items-center gap-1 label-mono ${className}`}>
       <Icon className="h-3.5 w-3.5" />
       {label}
+    </span>
+  );
+}
+
+// "Practiced N days this week" pill, with a flame + current streak when
+// there's an active one. Matches TrendBadge's label-mono sizing so the two
+// sit comfortably side by side in the stats grid.
+export function StreakBadge({ streak }: { streak: StreakData }) {
+  const { current_streak, days_this_week } = streak;
+
+  if (days_this_week === 0 && current_streak === 0) {
+    return <span className="label-mono text-muted-foreground/60">No sessions yet this week</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-3">
+      <span className="inline-flex items-center gap-1 label-mono">
+        {current_streak > 0 && <Flame className="h-3.5 w-3.5 text-seal" />}
+        <span className={current_streak > 0 ? "text-seal" : "text-muted-foreground"}>
+          {current_streak > 0
+            ? `${current_streak} day${current_streak === 1 ? "" : "s"} streak`
+            : "No active streak"}
+        </span>
+      </span>
+      <span className="label-mono text-muted-foreground">
+        {days_this_week} day{days_this_week === 1 ? "" : "s"} this week
+      </span>
     </span>
   );
 }

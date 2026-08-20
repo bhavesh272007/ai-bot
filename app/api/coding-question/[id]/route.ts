@@ -1,3 +1,4 @@
+// TARGET PATH: app/api/coding-question/[id]/route.ts
 import Groq from "groq-sdk";
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
@@ -79,21 +80,44 @@ Return ONLY a valid JSON object, no markdown formatting, no code fences, no extr
 }`;
 
     const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model: "openai/gpt-oss-120b",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.6,
+      response_format: { type: "json_object" },
     });
 
     const rawText = completion.choices[0]?.message?.content || "";
-    const cleaned = rawText.replace(/```json|```/g, "").trim();
+
+    // Strip markdown fences if present, then fall back to extracting the outermost {...} block
+    // in case the model added any stray text before/after the JSON despite response_format.
+    let cleaned = rawText.replace(/```json|```/g, "").trim();
+    const firstBrace = cleaned.indexOf("{");
+    const lastBrace = cleaned.lastIndexOf("}");
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+    }
 
     let generated;
     try {
       generated = JSON.parse(cleaned);
     } catch (parseErr) {
-      console.error("Failed to parse coding question response:", rawText);
+      console.error("Failed to parse coding question response. Raw output:", rawText);
       return Response.json(
         { error: "Failed to parse AI response. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    // Basic shape validation so a malformed-but-parseable response doesn't silently corrupt the DB row
+    if (
+      !generated?.title ||
+      !generated?.prompt ||
+      !Array.isArray(generated?.testCases) ||
+      !generated?.starterCode
+    ) {
+      console.error("Coding question response missing required fields:", generated);
+      return Response.json(
+        { error: "AI response was incomplete. Please try again." },
         { status: 500 }
       );
     }
