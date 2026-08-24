@@ -2,6 +2,7 @@
 "use client";
 
 import { INTERVIEW_TYPES, InterviewTypeDef } from "@/lib/interview-types";
+import styles from "./interview-type-cards.module.css";
 
 interface InterviewTypeCardsProps {
   /** If true, cards become clickable buttons that call onSelect. If false, purely informational. */
@@ -13,27 +14,24 @@ interface InterviewTypeCardsProps {
 function CardInner({ type, selected }: { type: InterviewTypeDef; selected: boolean }) {
   return (
     <>
-      <div className="flex items-center gap-2 mb-2">
-        <span
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ backgroundColor: type.accent }}
-        />
-        <p className="label-mono" style={{ color: type.accent }}>
+      <div className={styles.codeRow}>
+        <span className={styles.codeDot} style={{ backgroundColor: type.accent }} />
+        <p className={styles.codeText} style={{ color: type.accent }}>
           {type.ticketCode}
         </p>
       </div>
 
-      <h3 className="font-heading font-bold text-lg mb-2" style={{ color: type.accent }}>
+      <h3 className={styles.title} style={{ color: type.accent }}>
         {type.title}
       </h3>
 
-      <p className="text-sm text-muted-foreground mb-4">{type.description}</p>
+      <p className={styles.desc}>{type.description}</p>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className={styles.tags}>
         {type.tags.map((tag) => (
           <span
             key={tag}
-            className="label-mono rounded-full px-2.5 py-1"
+            className={styles.tag}
             style={{
               backgroundColor: `color-mix(in srgb, ${type.accent} 16%, transparent)`,
               color: type.accent,
@@ -45,9 +43,9 @@ function CardInner({ type, selected }: { type: InterviewTypeDef; selected: boole
       </div>
 
       {selected && (
-        <p className="label-mono mt-4" style={{ color: type.accent }}>
+        <span className={styles.selected} style={{ color: type.accent }}>
           ✓ Selected
-        </p>
+        </span>
       )}
     </>
   );
@@ -59,12 +57,12 @@ export function InterviewTypeCards({
   onSelect,
 }: InterviewTypeCardsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className={styles.grid}>
       {INTERVIEW_TYPES.map((type) => {
         const selected = interactive && selectedId === type.id;
-        const cardClass = `text-left rounded-lg border bg-card p-5 transition-all w-full ${
-          interactive ? "cursor-pointer hover:shadow-md hover:-translate-y-0.5" : ""
-        } ${selected ? "border-2" : "border border-border"}`;
+        const cardClass = `${styles.card} ${interactive ? styles.cardInteractive : ""} ${
+          selected ? styles.cardSelected : ""
+        }`;
         const cardStyle = selected ? { borderColor: type.accent } : undefined;
 
         if (interactive) {

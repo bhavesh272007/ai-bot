@@ -18,9 +18,10 @@ const STARTER_PROMPTS = [
 
 interface CareerChatWidgetProps {
   compact?: boolean;
+  initialPrompt?: string;
 }
 
-export default function CareerChatWidget({ compact = false }: CareerChatWidgetProps) {
+export default function CareerChatWidget({ compact = false, initialPrompt }: CareerChatWidgetProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,6 +44,16 @@ export default function CareerChatWidget({ compact = false }: CareerChatWidgetPr
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages, loading]);
+
+  // Auto-send a prefilled prompt once, if the caller passed one (e.g. the
+  // candidate dashboard linking here with a personalized question already
+  // filled in). Only fires on mount, and only if the chat is empty.
+  useEffect(() => {
+    if (initialPrompt && messages.length === 0) {
+      sendMessage(initialPrompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleFile(file: File) {
     setResumeError("");
@@ -120,14 +131,20 @@ export default function CareerChatWidget({ compact = false }: CareerChatWidgetPr
     <div className="border border-border rounded-xl bg-background flex flex-col overflow-hidden w-full h-full">
       {/* Header */}
       {!compact && (
-        <div className="px-6 py-4 text-center border-b border-border shrink-0">
+        <div
+          className="px-6 py-5 text-center border-b border-border shrink-0"
+          style={{ background: "linear-gradient(135deg, #eefac0 0%, #dcf3d4 35%, #ffffff 100%)" }}
+        >
           <p className="label-mono text-seal mb-1">Career Guidance Desk</p>
           <h1 className="font-heading font-bold text-lg text-foreground">Ask About Your Placement Prep</h1>
           <p className="text-xs text-muted-foreground mt-1">General guidance only — no login needed.</p>
         </div>
       )}
       {compact && (
-        <div className="px-4 py-3 border-b border-border shrink-0 flex items-center justify-between">
+        <div
+          className="px-4 py-3 border-b border-border shrink-0 flex items-center justify-between"
+          style={{ background: "linear-gradient(135deg, #eefac0 0%, #ffffff 85%)" }}
+        >
           <p className="label-mono text-seal">Career Guidance</p>
           {messages.length > 0 && (
             <button onClick={handleClearChat} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
@@ -138,7 +155,11 @@ export default function CareerChatWidget({ compact = false }: CareerChatWidgetPr
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3">
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-3"
+        style={{ background: "linear-gradient(180deg, #fbfef0 0%, #ffffff 260px)" }}
+      >
         {messages.length === 0 && (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground text-center pt-6">
@@ -234,7 +255,7 @@ export default function CareerChatWidget({ compact = false }: CareerChatWidgetPr
 
       {/* Floating capsule input with gradient glow border */}
       <div className="p-3 shrink-0">
-        <div className="rounded-full p-[1.5px] bg-gradient-to-r from-seal via-accent-foreground to-seal">
+        <div className="rounded-full p-[1.5px] bg-gradient-to-r from-[#a3ec5c] via-[#6fe0c0] to-[#a3ec5c]">
           <form onSubmit={handleSubmit} className="flex items-center gap-1.5 bg-background rounded-full pl-1.5 pr-1.5 py-1.5">
             <button
               type="button"

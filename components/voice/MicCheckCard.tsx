@@ -1,10 +1,11 @@
-// components/voice/MicCheckCard.tsx
+// TARGET PATH: components/voice/MicCheckCard.tsx
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useTextToSpeech } from "@/lib/voice/useTextToSpeech";
 import { useSpeechToText } from "@/lib/voice/useSpeechToText";
 import { useAudioLevel } from "@/lib/voice/useAudioLevel";
+import styles from "./MicCheckCard.module.css";
 
 const CALIBRATION_PROMPT = "I'm ready for my interview — testing one, two, three.";
 
@@ -65,7 +66,7 @@ export function MicCheckCard({ onVerified }: { onVerified?: () => void }) {
     if (status === "listening" || status === "prompting") setStatus("idle");
   };
 
-  // 12 ledger bars driven by live mic level
+  // 12 bars driven by live mic level
   const bars = Array.from({ length: 12 }, (_, i) => {
     const distanceFromCenter = Math.abs(i - 5.5);
     const activation = Math.max(0, level - distanceFromCenter * 0.06);
@@ -75,114 +76,66 @@ export function MicCheckCard({ onVerified }: { onVerified?: () => void }) {
   const isBusy = status === "prompting" || status === "listening";
 
   return (
-    <div className="relative mx-auto w-full max-w-md">
-      {/* punch-hole strip */}
-      <div className="absolute -top-3 left-0 right-0 flex justify-center gap-3">
-        {Array.from({ length: 8 }).map((_, i) => (
+    <div className={styles.panel}>
+      <div className={styles.headRow}>
+        <span className={styles.headLabel}>Voice calibration</span>
+        <span className={`${styles.statusPill} ${usingFallback ? styles.statusPillFallback : styles.statusPillReady}`}>
+          {usingFallback ? "Fallback mode" : "Voice engine ready"}
+        </span>
+      </div>
+
+      <div className={styles.micArea}>
+        <button
+          type="button"
+          onClick={handleTestMic}
+          disabled={isBusy}
+          className={`${styles.micBtn} ${isBusy ? styles.micBtnBusy : ""}`}
+          aria-label="Test my microphone"
+        >
+          <MicIcon />
+        </button>
+
+        <p className={styles.prompt}>&ldquo;{CALIBRATION_PROMPT}&rdquo;</p>
+      </div>
+
+      <div className={styles.waveform}>
+        {bars.map((h, i) => (
           <span
             key={i}
-            className="h-2 w-2 rounded-full border"
-            style={{ background: "var(--background)", borderColor: "var(--border)" }}
+            className={styles.bar}
+            style={{
+              height: status === "listening" ? `${h}%` : "14%",
+              background: status === "listening" ? "#1f8f74" : "#d8d8d8",
+              opacity: isBusy ? 1 : 0.6,
+            }}
           />
         ))}
       </div>
 
-      <div
-        className="rounded-lg border border-dashed px-6 pb-6 pt-8"
-        style={{ background: "var(--card)", borderColor: "var(--border)" }}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <span className="label-mono">Voice Calibration Slip</span>
-          <span
-            className="rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide"
-            style={{ color: "var(--seal)", borderColor: "var(--seal)" }}
-          >
-            {usingFallback ? "Fallback mode" : "Voice engine ready"}
+      <div className={styles.statusLine}>
+        {status === "idle" && !sttSupported && (
+          <span className={styles.statusIdleWarn}>Voice input isn&apos;t supported in this browser.</span>
+        )}
+        {status === "prompting" && <span className={styles.statusMuted}>Playing prompt…</span>}
+        {status === "listening" && <span className={styles.statusListening}>Listening — say the phrase now…</span>}
+        {status === "success" && (
+          <span className={styles.statusSuccess}>Mic verified — heard: &ldquo;{transcript}&rdquo;</span>
+        )}
+        {status === "error" && (
+          <span className={styles.statusError}>
+            {sttError ?? "Something went wrong."}{" "}
+            <button type="button" onClick={handleTestMic} className={styles.retryLink}>
+              Try again
+            </button>
           </span>
-        </div>
-
-        {/* seal-gold mic button */}
-        <div className="flex flex-col items-center gap-3 py-4">
-          <button
-            type="button"
-            onClick={handleTestMic}
-            disabled={isBusy}
-            className="seal-badge flex h-16 w-16 items-center justify-center transition-transform active:scale-95"
-            style={{
-              color: "var(--primary-foreground)",
-              boxShadow: isBusy ? "0 0 0 6px color-mix(in srgb, var(--seal) 15%, transparent)" : "none",
-            }}
-            aria-label="Test my microphone"
-          >
-            <MicIcon />
-          </button>
-
-          <p className="text-center text-sm italic" style={{ color: "var(--foreground)" }}>
-            "{CALIBRATION_PROMPT}"
-          </p>
-        </div>
-
-        {/* ledger waveform */}
-        <div className="my-4 flex h-16 items-end justify-center gap-1.5">
-          {bars.map((h, i) => (
-            <span
-              key={i}
-              className="w-2 rounded-sm transition-[height] duration-100"
-              style={{
-                height: status === "listening" ? `${h}%` : "12%",
-                background: status === "listening" ? "var(--seal)" : "var(--muted-foreground)",
-                opacity: isBusy ? 1 : 0.35,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* status line */}
-        <div className="min-h-[24px] text-center text-sm">
-          {status === "idle" && !sttSupported && (
-            <span style={{ color: "var(--destructive)" }}>Voice input isn't supported in this browser.</span>
-          )}
-          {status === "prompting" && <span style={{ color: "var(--muted-foreground)" }}>Playing prompt…</span>}
-          {status === "listening" && <span style={{ color: "var(--seal)" }}>Listening — say the phrase now…</span>}
-          {status === "success" && (
-            <span style={{ color: "var(--verified)" }}>Mic verified — heard: "{transcript}"</span>
-          )}
-          {status === "error" && (
-            <span style={{ color: "var(--destructive)" }}>
-              {sttError ?? "Something went wrong."}{" "}
-              <button type="button" onClick={handleTestMic} className="underline">
-                Try again
-              </button>
-            </span>
-          )}
-        </div>
-
-        {isBusy && (
-          <button
-            type="button"
-            onClick={handleStop}
-            className="mx-auto mt-3 block text-xs underline"
-            style={{ color: "var(--muted-foreground)" }}
-          >
-            Cancel
-          </button>
         )}
       </div>
 
-      {/* barcode footer */}
-      <div className="mt-2 flex items-end justify-center gap-[2px]" aria-hidden="true">
-        {Array.from({ length: 40 }).map((_, i) => (
-          <span
-            key={i}
-            style={{
-              width: (i * 7) % 3 === 0 ? "2px" : "1px",
-              height: (i * 5) % 4 === 0 ? "14px" : "9px",
-              background: "var(--foreground)",
-              opacity: 0.7,
-            }}
-          />
-        ))}
-      </div>
+      {isBusy && (
+        <button type="button" onClick={handleStop} className={styles.cancelBtn}>
+          Cancel
+        </button>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 // TARGET PATH: app/create/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +16,33 @@ import {
   RefreshCw,
   Trash2,
   ArrowLeft,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react";
 
 const CATEGORIES = ["CS Fundamentals", "DSA", "Project/Resume", "Behavioral"] as const;
+
+const EXAMPLE_JDS = [
+  {
+    label: "Backend Engineer",
+    text: "We're hiring a Backend Engineer to design and maintain REST APIs, work with PostgreSQL and Redis, and help scale our services. 2+ years of experience with Node.js or Python required. Familiarity with system design, caching strategies, and CI/CD pipelines is a strong plus. You'll collaborate closely with frontend and DevOps teams to ship reliable, well-tested features.",
+  },
+  {
+    label: "Frontend Developer",
+    text: "Looking for a Frontend Developer skilled in React and TypeScript to build responsive, accessible interfaces. You should be comfortable with component architecture, state management, and performance optimization. Experience with Next.js and Tailwind CSS is preferred. You'll work directly with designers to ship polished, production-ready user experiences.",
+  },
+  {
+    label: "Data Analyst",
+    text: "We need a Data Analyst who can write complex SQL queries, build dashboards in Power BI or Tableau, and communicate insights clearly to non-technical stakeholders. A strong understanding of statistics, A/B testing, and data cleaning is expected. Experience with Python (pandas) for exploratory analysis is a bonus.",
+  },
+];
+
+const STAGE_ORDER = ["input", "review", "issued"] as const;
+const STAGE_LABELS: Record<(typeof STAGE_ORDER)[number], string> = {
+  input: "Paste JD",
+  review: "Review Questions",
+  issued: "Share Link",
+};
 
 interface QuestionDraft {
   id: string;
@@ -28,6 +52,40 @@ interface QuestionDraft {
 
 type Stage = "input" | "review" | "issued";
 
+const PAGE_GRADIENT =
+  "radial-gradient(circle at 50% 0%, #f2ff6b 0%, #d4f24f 10%, transparent 32%), linear-gradient(180deg, #c6f24a 0%, #a3ec5c 8%, #7fe3a0 16%, #6fe0c0 24%, #7fe8dd 32%, #cdf3ec 42%, #ffffff 56%)";
+
+function StepIndicator({ stage }: { stage: Stage }) {
+  const currentIndex = STAGE_ORDER.indexOf(stage);
+  return (
+    <div className="flex items-center justify-center gap-2 flex-wrap">
+      {STAGE_ORDER.map((s, i) => {
+        const isDone = i < currentIndex;
+        const isActive = i === currentIndex;
+        return (
+          <div key={s} className="flex items-center gap-2">
+            <div className={`flex items-center gap-1.5 ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-[0.7rem] font-semibold shrink-0 ${
+                  isDone
+                    ? "bg-verified text-background"
+                    : isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                {isDone ? <Check className="h-3 w-3" /> : i + 1}
+              </span>
+              <span className="label-mono">{STAGE_LABELS[s]}</span>
+            </div>
+            {i < STAGE_ORDER.length - 1 && <span className="h-px w-6 bg-border shrink-0" />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function CreateInterview() {
   const { session, loading: authLoading, logout } = useRequireAuth();
 
@@ -35,6 +93,16 @@ export default function CreateInterview() {
   const [jobDescription, setJobDescription] = useState("");
   const [questions, setQuestions] = useState<QuestionDraft[]>([]);
   const [interviewId, setInterviewId] = useState<string | null>(null);
+
+  // Prefill from "Duplicate" on the recruiter dashboard — one-shot read,
+  // cleared immediately so a page refresh doesn't keep re-prefilling.
+  useEffect(() => {
+    const duplicated = sessionStorage.getItem("duplicate_job_description");
+    if (duplicated) {
+      setJobDescription(duplicated);
+      sessionStorage.removeItem("duplicate_job_description");
+    }
+  }, []);
 
   const [loading, setLoading] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
@@ -198,6 +266,11 @@ export default function CreateInterview() {
     setNewQuestionText("");
   }
 
+  const categoryCounts = CATEGORIES.map((c) => ({
+    category: c,
+    count: questions.filter((q) => q.category === c).length,
+  })).filter((x) => x.count > 0);
+
   if (authLoading) {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center">
@@ -210,11 +283,11 @@ export default function CreateInterview() {
   }
 
   return (
-    <main className="min-h-screen bg-background px-4 py-12">
+    <main className="min-h-screen px-4 py-12" style={{ background: PAGE_GRADIENT }}>
       <div className="mx-auto max-w-3xl space-y-8">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
           <p className="label-mono">Recruiter tools</p>
-          <h1 className="text-3xl">AI Interview Practice Booth</h1>
+          <h1 className="text-3xl font-heading font-semibold">AI Interview Practice Booth</h1>
           <p className="text-muted-foreground">
             Paste a job description to generate a tailored interview
           </p>
@@ -229,46 +302,100 @@ export default function CreateInterview() {
               Log Out
             </button>
           </div>
+          <div className="pt-3">
+            <StepIndicator stage={stage} />
+          </div>
         </div>
 
         {/* ---------- STAGE: input ---------- */}
         {stage === "input" && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Job Description</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Textarea
-                placeholder="Paste the job description here..."
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-                rows={8}
-              />
-              <Button
-                onClick={handleGeneratePreview}
-                disabled={loading || jobDescription.trim().length < 20}
-                className="w-full"
-              >
-                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {loading ? "Generating questions..." : "Generate Interview Questions"}
-              </Button>
-              {error && (
-                <p className="flex items-center justify-center gap-1.5 text-sm text-destructive text-center">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  {error}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start">
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle>Job Description</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="label-mono text-muted-foreground/70">Try an example:</span>
+                  {EXAMPLE_JDS.map((ex) => (
+                    <button
+                      key={ex.label}
+                      type="button"
+                      onClick={() => setJobDescription(ex.text)}
+                      className="text-xs font-medium border border-border rounded-full px-3 py-1.5 text-foreground hover:border-foreground/30 hover:bg-muted transition-colors"
+                    >
+                      {ex.label}
+                    </button>
+                  ))}
+                </div>
+                <Textarea
+                  placeholder="Paste the job description here..."
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  rows={8}
+                />
+                <Button
+                  onClick={handleGeneratePreview}
+                  disabled={loading || jobDescription.trim().length < 20}
+                  className="w-full"
+                >
+                  {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {loading ? "Generating questions..." : "Generate Interview Questions"}
+                </Button>
+                {error && (
+                  <p className="flex items-center justify-center gap-1.5 text-sm text-destructive text-center">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    {error}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <p className="label-mono text-seal mb-1">How it works</p>
+                <CardTitle className="text-base">What happens next</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ol className="space-y-3 text-sm text-muted-foreground">
+                  <li className="flex gap-2.5">
+                    <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-foreground text-[0.65rem] font-semibold">1</span>
+                    Paste a job description — longer, detailed ones (100+ words) generate more relevant questions.
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-foreground text-[0.65rem] font-semibold">2</span>
+                    We generate questions across CS Fundamentals, DSA, Project/Resume, and Behavioral.
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-foreground text-[0.65rem] font-semibold">3</span>
+                    Edit the wording, swap any question, or add your own before sharing.
+                  </li>
+                  <li className="flex gap-2.5">
+                    <span className="shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-foreground text-[0.65rem] font-semibold">4</span>
+                    Get a link — the candidate's scored results land on your dashboard automatically.
+                  </li>
+                </ol>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* ---------- STAGE: review (edit / add / swap / remove) ---------- */}
         {stage === "review" && (
           <>
             <Card>
-              <CardHeader>
+              <CardHeader className="space-y-2">
                 <p className="label-mono mb-1">Not shared yet</p>
                 <CardTitle>Review &amp; Customize Questions ({questions.length})</CardTitle>
+                {categoryCounts.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {categoryCounts.map(({ category, count }) => (
+                      <Badge key={category} variant="secondary" className="text-xs font-mono">
+                        {category} · {count}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
@@ -391,21 +518,16 @@ export default function CreateInterview() {
         {/* ---------- STAGE: issued ---------- */}
         {stage === "issued" && interviewId && (
           <>
-            {/* Shareable link styled as the issued hall ticket */}
             <Card className="overflow-hidden pt-0">
-              <div className="flex gap-1.5 px-6 pt-4 pb-2">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-background border border-border"
-                  />
-                ))}
-              </div>
+              <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #a3ec5c, #6fe0c0)" }} />
               <CardHeader>
-                <p className="label-mono mb-1">Candidate ticket issued</p>
+                <p className="label-mono mb-1 flex items-center gap-1.5 text-verified">
+                  <Sparkles className="h-3 w-3" />
+                  Interview created
+                </p>
                 <CardTitle>Shareable Interview Link</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Send this link to a candidate — they'll take the interview and
                   their scored results will show up on your dashboard.
@@ -431,14 +553,20 @@ export default function CreateInterview() {
                     )}
                   </Button>
                 </div>
-                <div className="flex justify-center gap-0.5 pt-2 opacity-40">
-                  {[2, 1, 3, 1, 2, 1, 1, 3, 2, 1, 2, 1, 3, 1, 2, 1, 2].map((w, i) => (
-                    <div
-                      key={i}
-                      style={{ width: `${w}px`, height: "16px" }}
-                      className="bg-foreground"
-                    />
-                  ))}
+
+                <div className="space-y-2 pt-2 border-t border-border">
+                  <p className="flex items-center gap-2 text-sm text-verified pt-3">
+                    <Check className="h-4 w-4 shrink-0" />
+                    Interview created and ready to share
+                  </p>
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <ArrowRight className="h-4 w-4 shrink-0" />
+                    Share the link above with your candidate
+                  </p>
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <ArrowRight className="h-4 w-4 shrink-0" />
+                    Scored results will appear on your dashboard automatically
+                  </p>
                 </div>
               </CardContent>
             </Card>

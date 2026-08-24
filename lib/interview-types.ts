@@ -25,7 +25,7 @@ export const INTERVIEW_TYPES: InterviewTypeDef[] = [
     description:
       "Master the STAR method with AI-generated behavioral questions on leadership, teamwork, conflict resolution, and problem-solving.",
     tags: ["STAR Method", "Leadership", "Teamwork", "Problem Solving"],
-    accent: "var(--foreground)", // tracks ink — light: #14213D, dark: #F3F1E9
+    accent: "#3A5FCD", // distinct blue — was var(--foreground), which is near-black and blended into body text
     promptFocus:
       "6 Behavioral questions (STAR-method style, covering leadership, teamwork, conflict resolution, and problem-solving) and 2 Experience questions. Skip DSA entirely and include at most 1 CS Fundamentals question.",
   },

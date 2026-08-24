@@ -4,6 +4,7 @@
 import { useState, useRef } from "react";
 import { FileText, X, Loader2, AlertCircle, UploadCloud } from "lucide-react";
 import { extractResumeText, truncateResumeText } from "@/lib/resume-parser";
+import styles from "./resume-upload.module.css";
 
 interface ResumeUploadProps {
   onExtracted: (text: string) => void;
@@ -42,37 +43,28 @@ export function ResumeUpload({ onExtracted, onClear }: ResumeUploadProps) {
   }
 
   return (
-    <div className="space-y-2">
-      <label className="label-mono">Resume (optional)</label>
+    <div className={styles.wrap}>
+      <label className={styles.label}>Resume (optional)</label>
 
       {!fileName ? (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="w-full border border-dashed border-border rounded-lg px-4 py-5 flex flex-col items-center gap-1.5 text-center hover:border-foreground/40 hover:bg-muted/40 transition-colors"
-        >
-          <UploadCloud className="h-5 w-5 text-muted-foreground" />
-          <span className="text-sm text-foreground">
+        <button type="button" onClick={() => inputRef.current?.click()} className={styles.dropzone}>
+          <UploadCloud size={20} className={styles.dropzoneIcon} />
+          <span className={styles.dropzoneText}>
             Upload your resume to personalize your questions
           </span>
-          <span className="label-mono">PDF, DOCX, or TXT</span>
+          <span className={styles.dropzoneHint}>PDF, DOCX, or TXT</span>
         </button>
       ) : (
-        <div className="w-full border border-border rounded-lg px-4 py-3 flex items-center gap-3">
+        <div className={styles.fileRow}>
           {extracting ? (
-            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+            <Loader2 size={16} className={styles.fileSpinner} />
           ) : (
-            <FileText className="h-4 w-4 shrink-0 text-verified" />
+            <FileText size={16} className={styles.fileIconOk} />
           )}
-          <span className="text-sm text-foreground truncate flex-1">{fileName}</span>
+          <span className={styles.fileName}>{fileName}</span>
           {!extracting && (
-            <button
-              type="button"
-              onClick={handleClear}
-              title="Remove resume"
-              className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-            >
-              <X className="h-4 w-4" />
+            <button type="button" onClick={handleClear} title="Remove resume" className={styles.removeBtn}>
+              <X size={16} />
             </button>
           )}
         </div>
@@ -90,14 +82,14 @@ export function ResumeUpload({ onExtracted, onClear }: ResumeUploadProps) {
       />
 
       {error && (
-        <p className="flex items-center gap-1.5 text-sm text-destructive">
-          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+        <p className={styles.errorMsg}>
+          <AlertCircle size={14} />
           {error}
         </p>
       )}
 
-      <p className="label-mono text-muted-foreground/60">
-        Your resume is read in your browser to generate questions — it's never
+      <p className={styles.privacyNote}>
+        Your resume is read in your browser to generate questions — it&apos;s never
         uploaded or stored anywhere.
       </p>
     </div>

@@ -3,13 +3,28 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { Playfair_Display, Inter, Caveat } from "next/font/google";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
+import styles from "./page.module.css";
 
-const inputClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-foreground";
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-playfair",
+});
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-inter",
+});
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["600"],
+  variable: "--font-caveat",
+});
 
 export default function Login() {
   const router = useRouter();
@@ -39,42 +54,49 @@ export default function Login() {
   }
 
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center px-4">
-      <Card className="max-w-sm w-full overflow-hidden pt-0">
-        <div className="flex gap-1.5 px-6 pt-4 pb-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="w-1.5 h-1.5 rounded-full bg-background border border-border"
-            />
-          ))}
-        </div>
-        <CardHeader>
-          <p className="label-mono mb-1">Recruiter access</p>
-          <CardTitle className="text-xl">Log in</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label className="label-mono">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              className={inputClass}
-              placeholder="you@company.com"
-              autoComplete="email"
-            />
+    <div className={`${playfair.variable} ${inter.variable} ${caveat.variable} ${styles.page}`}>
+      <nav className={styles.topNav}>
+        <Link href="/" className={styles.logo}>
+          <span className={styles.logoBadge}>AI</span>
+          Interview Booth
+        </Link>
+        <Link href="/" className={styles.backHome}>← Back to home</Link>
+      </nav>
+
+      <div className={styles.authWrap}>
+        <span className={styles.heroNote}>welcome back!</span>
+
+        <div className={styles.authCard}>
+          <span className={styles.eyebrow}>Recruiter access</span>
+          <h1>Log in</h1>
+          <p className={styles.authSub}>
+            Get back to generating and tracking interviews for your candidates.
+          </p>
+
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Email</label>
+            <div className={styles.inputWrap}>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                className={styles.input}
+                placeholder="you@company.com"
+                autoComplete="email"
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <label className="label-mono">Password</label>
-            <div className="relative">
+
+          <div className={styles.field}>
+            <label className={styles.fieldLabel}>Password</label>
+            <div className={styles.inputWrap}>
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                className={`${inputClass} pr-10`}
+                className={`${styles.input} ${styles.inputPassword}`}
                 placeholder="••••••••"
                 autoComplete="current-password"
               />
@@ -82,47 +104,37 @@ export default function Login() {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 tabIndex={-1}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
+                className={styles.eyeToggle}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
-          <Button
+          <button
+            type="button"
             onClick={handleLogin}
             disabled={loading || !email || !password}
-            className="w-full"
+            className={styles.submitBtn}
           >
-            {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {loading ? "Logging in..." : "Log In"}
-          </Button>
+            {loading && <Loader2 size={16} className={styles.spinner} />}
+            {loading ? "Logging in…" : "Log In"}
+          </button>
 
           {error && (
-            <p className="flex items-center justify-center gap-1.5 text-sm text-destructive text-center">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <p className={styles.errorMsg}>
+              <AlertCircle size={14} />
               {error}
             </p>
           )}
 
-          <p className="text-sm text-muted-foreground text-center">
+          <p className={styles.footNote}>
             Don&apos;t have an account?{" "}
-            <a href="/signup" className="text-seal hover:underline font-medium">
-              Sign up
-            </a>
+            <Link href="/signup" className={styles.footLink}>Sign up</Link>
           </p>
-          <p className="text-sm text-muted-foreground/70 text-center">
-            <a href="/" className="hover:underline">
-              ← Back to home
-            </a>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+        </div>
+      </div>
+    </div>
   );
 }

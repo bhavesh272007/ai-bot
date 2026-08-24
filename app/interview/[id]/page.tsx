@@ -13,6 +13,7 @@ import { ResumeUpload } from "@/components/resume-upload";
 import { InterviewerAvatar } from "@/components/interviewer-avatar";
 import { CandidateCamera } from "@/components/candidate-camera";
 import { InterviewProgress } from "@/components/interview/InterviewProgress";
+import { MeetingModeCall } from "@/components/interview/meeting-mode-call";
 import { useTextToSpeech } from "@/lib/voice/useTextToSpeech";
 import { useAudioLevel } from "@/lib/voice/useAudioLevel";
 import { toDisplayScore } from "@/lib/scoring";
@@ -69,6 +70,15 @@ function scoreTextClass(score: number) {
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+// Meeting-mode elapsed-time display — "4:32" under an hour, "1:04:32" past it.
+function formatElapsed(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
 }
 
 // Ranks voices for the picker's default ordering — Indian English first
@@ -137,6 +147,23 @@ export default function CandidateInterview() {
   const [voiceInputSupported, setVoiceInputSupported] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true); // auto-read questions aloud
   const [cameraEnabled, setCameraEnabled] = useState(true); // self-view during the interview, never recorded
+  // Live-meeting-call skin (Phase 14): dark video-call layout. The question
+  // is delivered by voice with a progressive caption (no separate "question
+  // card"); the answer is captured by voice by default, with an optional
+  // typed-answer panel for when the candidate prefers to type. Forces voice
+  // + camera on since the mode is meaningless without them.
+  const [meetingMode, setMeetingMode] = useState(false);
+  // Mic auto-listen toggle, meeting-mode only — ON by default. When on, the
+  // mic starts listening automatically the moment the interviewer finishes
+  // speaking (see the tts.isSpeaking watcher effect below).
+  const [micAutoOn, setMicAutoOn] = useState(true);
+  // Meeting-mode only — reveals a plain textarea below the call area so the
+  // candidate can type instead of / in addition to speaking.
+  const [showTypedAnswer, setShowTypedAnswer] = useState(false);
+  // Word-boundary count since the CURRENT question started speaking — drives
+  // the progressive caption under the interviewer panel. Reset to 0 every
+  // time a new question/follow-up starts (see the TTS effect below).
+  const [wordsSpokenInQuestion, setWordsSpokenInQuestion] = useState(0);
   const [selectedVoiceName, setSelectedVoiceName] = useState("");
   const tts = useTextToSpeech();
   const audioLevel = useAudioLevel();
@@ -164,6 +191,20 @@ export default function CandidateInterview() {
   } | null>(null);
   const [followUpCount, setFollowUpCount] = useState(0);
   const [checkingFollowUp, setCheckingFollowUp] = useState(false);
+
+  // ---------- Meeting-mode header: elapsed time + network info ----------
+  const interviewStartRef = useRef<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [networkInfo, setNetworkInfo] = useState<{
+    downlinkMbps: number | null;
+    rttMs: number | null;
+    quality: string | null;
+  }>({ downlinkMbps: null, rttMs: null, quality: null });
+  // Caps how many times the meeting-mode "keeper" effect will retry starting
+  // the mic for the CURRENT question — resets on every new question (see the
+  // TTS-speak effect below). Without this, a genuinely denied mic permission
+  // would otherwise trigger an endless retry/prompt loop.
+  const micRestartAttemptsRef = useRef(0);
 
   // The question actually being shown right now — either the next scripted
   // question, or a follow-up probing the answer just given.
@@ -266,10 +307,16 @@ export default function CandidateInterview() {
     if (stage !== "interview" || !voiceEnabled || !voiceSupported) return;
     if (!currentQuestion) return;
 
+    setWordsSpokenInQuestion(0); // fresh caption for the new question
+    micRestartAttemptsRef.current = 0; // fresh mic-retry budget for the new question
+
     tts.speak(currentQuestion.question, {
       rate: 1,
       voiceName: selectedVoiceName || undefined,
-      onBoundary: () => setSpeakTick((t) => t + 1),
+      onBoundary: () => {
+        setSpeakTick((t) => t + 1);
+        setWordsSpokenInQuestion((w) => w + 1);
+      },
     });
 
     return () => {
@@ -277,6 +324,99 @@ export default function CandidateInterview() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage, currentIndex, activeFollowUp, voiceEnabled, voiceSupported, selectedVoiceName]);
+
+  // Meeting-mode caption fallback: onBoundary above is best-effort — some
+  // browser voices never fire word-boundary events at all (see the note in
+  // interviewer-avatar.tsx), which would leave the AI caption stuck at 0
+  // words forever. This timer advances the caption at a fixed pace purely
+  // off tts.isSpeaking, so the caption always completes by the time speech
+  // ends regardless of whether boundary events fire. Harmless if boundary
+  // events ALSO fire — the caption is clamped to the question's word count.
+  useEffect(() => {
+    if (!tts.isSpeaking) return;
+    const WORDS_PER_SECOND = 2.3; // rough average TTS speaking pace
+    const id = setInterval(() => {
+      setWordsSpokenInQuestion((w) => w + 1);
+    }, 1000 / WORDS_PER_SECOND);
+    return () => clearInterval(id);
+  }, [tts.isSpeaking]);
+
+  // Meeting-mode: tick the elapsed-time clock once a second while the
+  // interview is running.
+  useEffect(() => {
+    if (stage !== "interview") return;
+    const id = setInterval(() => {
+      if (interviewStartRef.current !== null) {
+        setElapsedSeconds(Math.floor((Date.now() - interviewStartRef.current) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [stage]);
+
+  // Meeting-mode: best-effort network stats via the (Chromium-only)
+  // NetworkInformation API. Silently no-ops on browsers that don't expose
+  // navigator.connection (Safari, Firefox) — the header just omits that row.
+  useEffect(() => {
+    const conn = typeof navigator !== "undefined" ? (navigator as any).connection : null;
+    if (!conn) return;
+
+    function readConnection() {
+      const downlink = typeof conn.downlink === "number" ? conn.downlink : null;
+      const rtt = typeof conn.rtt === "number" ? conn.rtt : null;
+      const effectiveType: string | undefined = conn.effectiveType;
+      const quality =
+        effectiveType === "4g"
+          ? "Good"
+          : effectiveType === "3g"
+          ? "Average"
+          : effectiveType
+          ? "Poor"
+          : null;
+      setNetworkInfo({ downlinkMbps: downlink, rttMs: rtt, quality });
+    }
+
+    readConnection();
+    conn.addEventListener?.("change", readConnection);
+    return () => conn.removeEventListener?.("change", readConnection);
+  }, []);
+
+  // Meeting-mode: mic is on by default. This is a "keeper" effect, not a
+  // one-shot — it re-evaluates every time isListening or tts.isSpeaking
+  // changes, so if native SpeechRecognition times out from silence (browsers
+  // do this even with continuous:true, often within a few seconds) it just
+  // restarts automatically instead of leaving the mic silently dead. A short
+  // debounce avoids hammering getUserMedia if it's restarting rapidly, and a
+  // per-question attempt cap stops it from endlessly re-prompting if
+  // permission was actually denied.
+  useEffect(() => {
+    if (!meetingMode || stage !== "interview") return;
+    if (!voiceInputSupported || !micAutoOn) return;
+    if (tts.isSpeaking || isListening || transcribing || showTypedAnswer || checkingFollowUp) return;
+    if (micRestartAttemptsRef.current >= 8) return;
+
+    const t = setTimeout(() => {
+      micRestartAttemptsRef.current += 1;
+      baseAnswerRef.current = currentAnswer ? currentAnswer.trim() + " " : "";
+      if (micSupported) {
+        startNativeRecognition();
+      } else {
+        startFallbackRecording();
+      }
+    }, 700);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    meetingMode,
+    stage,
+    voiceInputSupported,
+    micAutoOn,
+    tts.isSpeaking,
+    isListening,
+    transcribing,
+    showTypedAnswer,
+    checkingFollowUp,
+  ]);
 
   // Stop any speech/recognition/recording on unmount
   useEffect(() => {
@@ -385,6 +525,9 @@ export default function CandidateInterview() {
         baseAnswerRef.current = baseAnswerRef.current + final;
       }
       setCurrentAnswer((baseAnswerRef.current + interim).trim());
+      // Proof the mic is actually working — a long answer with several
+      // natural pauses shouldn't ever hit the meeting-mode restart cap.
+      if (final || interim) micRestartAttemptsRef.current = 0;
     };
 
     recognition.onerror = (e: any) => {
@@ -406,8 +549,18 @@ export default function CandidateInterview() {
 
     recognitionRef.current = recognition;
     setUsingFallback(false);
-    recognition.start();
-    setIsListening(true);
+    try {
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      // Most commonly thrown when the browser hasn't fully released the mic
+      // from the PREVIOUS recognition session yet (only one can be active at
+      // a time). Leaving isListening false here (rather than throwing
+      // uncaught) means the meeting-mode keeper effect just quietly retries
+      // on its next debounce tick instead of the mic dying with no signal.
+      recognitionRef.current = null;
+      setIsListening(false);
+    }
   }
 
   // Phase 11: STT — mic button transcribes into the same textarea as typing.
@@ -449,6 +602,38 @@ export default function CandidateInterview() {
     }
   }
 
+  // Stops whichever capture path is currently active, without touching TTS.
+  // Shared by the meeting-mode mic toggle and the "type answer" toggle below.
+  function stopListeningNow() {
+    if (usingFallback) {
+      mediaRecorderRef.current?.stop();
+    } else {
+      recognitionRef.current?.stop();
+    }
+  }
+
+  // Meeting-mode only — flips the auto-listen mic on/off. Turning it off
+  // mid-capture stops the current recording immediately rather than waiting
+  // for the question to end.
+  function toggleMicAuto() {
+    setMicAutoOn((prev) => {
+      const next = !prev;
+      if (!next && isListening) stopListeningNow();
+      return next;
+    });
+  }
+
+  // Meeting-mode only — reveals/hides the typed-answer panel. Opening it
+  // stops any in-progress voice capture so typed and spoken text can't
+  // collide in the same answer.
+  function toggleTypedAnswer() {
+    setShowTypedAnswer((prev) => {
+      const next = !prev;
+      if (next && isListening) stopListeningNow();
+      return next;
+    });
+  }
+
   function beginInterview() {
     setAnswers([]);
     setCurrentIndex(0);
@@ -456,6 +641,8 @@ export default function CandidateInterview() {
     setActiveFollowUp(null);
     setFollowUpCount(0);
     setReviewingIndex(null);
+    interviewStartRef.current = Date.now();
+    setElapsedSeconds(0);
     setStage("interview");
   }
 
@@ -668,15 +855,7 @@ export default function CandidateInterview() {
   if (stage === "intro") {
     return (
       <main className="min-h-screen bg-background flex items-center justify-center px-4">
-        <Card className="max-w-lg w-full overflow-hidden pt-0">
-          <div className="flex gap-1.5 px-6 pt-4 pb-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="w-1.5 h-1.5 rounded-full bg-background border border-border"
-              />
-            ))}
-          </div>
+        <Card className="max-w-lg w-full overflow-hidden">
           <CardHeader>
             <p className="label-mono mb-1">
               {isPractice ? "Practice mode" : "Admit one candidate"}
@@ -759,6 +938,30 @@ export default function CandidateInterview() {
               Show my webcam during the interview (for a realistic feel — never recorded or stored)
             </label>
 
+            {voiceSupported && voiceInputSupported && (
+              <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  checked={meetingMode}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setMeetingMode(enabled);
+                    // Meaningless without both — force them on so the toggle
+                    // never leaves the candidate in a half-configured state.
+                    if (enabled) {
+                      setVoiceEnabled(true);
+                      setCameraEnabled(true);
+                    }
+                  }}
+                  className="h-4 w-4 mt-0.5 accent-foreground"
+                />
+                <span>
+                  Live meeting mode — full-screen video-call view. The question is
+                  only ever asked aloud, never shown as text.
+                </span>
+              </label>
+            )}
+
             {voiceSupported && voiceEnabled && tts.voices.length > 0 && (
               <div className="space-y-1">
                 <label className="label-mono">Interviewer voice</label>
@@ -818,6 +1021,53 @@ export default function CandidateInterview() {
   // ---------- INTERVIEW ----------
   if (stage === "interview") {
     const current = currentQuestion;
+
+    if (meetingMode && current) {
+      return (
+        <MeetingModeCall
+          category={current.category}
+          roleLabel={
+            isPanelMode ? PANEL_ROLE_LABELS[activeRole] : targetRole || "Interviewer"
+          }
+          isFollowUp={!!activeFollowUp}
+          questionIndex={currentIndex}
+          totalQuestions={questions.length}
+          questionText={current.question}
+          revealedWordCount={wordsSpokenInQuestion}
+          avatarState={tts.isSpeaking ? "speaking" : isListening ? "listening" : "idle"}
+          micLevel={audioLevel.level}
+          speakTick={speakTick}
+          cameraEnabled={cameraEnabled}
+          voiceInputSupported={voiceInputSupported}
+          isListening={isListening}
+          usingFallback={usingFallback}
+          transcribing={transcribing}
+          micAutoOn={micAutoOn}
+          onToggleMicAuto={toggleMicAuto}
+          liveAnswerTranscript={currentAnswer}
+          showTypedAnswer={showTypedAnswer}
+          onToggleTypedAnswer={toggleTypedAnswer}
+          onAnswerChange={setCurrentAnswer}
+          voiceEnabled={voiceEnabled}
+          onToggleVoice={toggleVoiceEnabled}
+          onReplay={replayQuestion}
+          elapsedLabel={formatElapsed(elapsedSeconds)}
+          networkInfo={networkInfo}
+          checkingFollowUp={checkingFollowUp}
+          nextLabel={
+            checkingFollowUp
+              ? "One moment..."
+              : activeFollowUp
+              ? "Submit Follow-up"
+              : currentIndex + 1 < questions.length
+              ? "Next Question"
+              : "Finish Interview"
+          }
+          onNext={handleNext}
+          onSkip={handleSkip}
+        />
+      );
+    }
 
     return (
       <main className="min-h-screen bg-background px-4 py-12">

@@ -3,15 +3,49 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { Playfair_Display, Inter, Caveat } from "next/font/google";
+import { Loader2, AlertCircle } from "lucide-react";
 import { InterviewTypeCards } from "@/components/interview-type-cards";
 import { DomainCards, type Domain } from "@/components/domain-cards";
 import { ResumeUpload } from "@/components/resume-upload";
-import { getInterviewType } from "@/lib/interview-types";
 import { INTERVIEWER_PERSONALITIES } from "@/lib/interviewer-personalities";
+import styles from "./page.module.css";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-playfair",
+});
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-inter",
+});
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["600"],
+  variable: "--font-caveat",
+});
 
 const LEVELS = ["Internship", "Entry-level", "Experienced"] as const;
+
+// Cosmetic-only accent per personality card — cycles through the same three
+// tones the landing page uses for Strict / Friendly / Rapid-Fire, matched by
+// keyword where possible so new personalities still get a sensible color.
+const PERSONALITY_PALETTE = [
+  { border: "rgba(166, 61, 64, 0.35)", borderHover: "#a63d40", wash: "rgba(166, 61, 64, 0.06)", dot: "#a63d40" },
+  { border: "rgba(47, 110, 81, 0.35)", borderHover: "#2f6e51", wash: "rgba(47, 110, 81, 0.06)", dot: "#2f6e51" },
+  { border: "rgba(200, 155, 60, 0.45)", borderHover: "#c89b3c", wash: "rgba(200, 155, 60, 0.08)", dot: "#c89b3c" },
+];
+function personalityAccent(id: string, index: number) {
+  const key = id.toLowerCase();
+  if (key.includes("strict")) return PERSONALITY_PALETTE[0];
+  if (key.includes("friendly")) return PERSONALITY_PALETTE[1];
+  if (key.includes("rapid")) return PERSONALITY_PALETTE[2];
+  return PERSONALITY_PALETTE[index % PERSONALITY_PALETTE.length];
+}
 
 export default function Practice() {
   const router = useRouter();
@@ -82,31 +116,27 @@ export default function Practice() {
   }
 
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center px-4 py-12">
-      <Card className="max-w-4xl w-full overflow-hidden pt-0">
-        <div className="flex gap-1.5 px-6 pt-4 pb-2">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div
-              key={i}
-              className="w-1.5 h-1.5 rounded-full bg-background border border-border"
-            />
-          ))}
-        </div>
+    <div className={`${playfair.variable} ${inter.variable} ${caveat.variable} ${styles.page}`}>
+      <nav className={styles.topNav}>
+        <Link href="/" className={styles.logo}>
+          <span className={styles.logoBadge}>AI</span>
+          Interview Booth
+        </Link>
+        <Link href="/" className={styles.backHome}>← Back to home</Link>
+      </nav>
 
-        <CardHeader>
-          <p className="label-mono mb-1">Self practice · no login needed</p>
-          <CardTitle>Build your own mock interview</CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          <p className="text-sm text-muted-foreground">
-            Tell us what you're preparing for. We'll generate a full practice
+      <div className={styles.wrap}>
+        <div className={styles.card}>
+          <span className={styles.eyebrow}>Self practice · no login needed</span>
+          <h1>Build your own mock interview</h1>
+          <p className={styles.intro}>
+            Tell us what you&apos;re preparing for. We&apos;ll generate a full practice
             interview — question round, live coding, and voice practice — scored
             just like the real thing. Nothing here is tracked by any recruiter.
           </p>
 
-          <div className="space-y-2">
-            <label className="label-mono">Choose interview type</label>
+          <div className={styles.section}>
+            <p className={styles.sectionLabel}>Choose interview type</p>
             <InterviewTypeCards
               interactive
               selectedId={interviewType}
@@ -114,9 +144,9 @@ export default function Practice() {
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="label-mono">Choose your domain</label>
-            <p className="text-sm text-muted-foreground/70">
+          <div className={styles.section}>
+            <p className={styles.sectionLabel}>Choose your domain</p>
+            <p className={styles.sectionHint}>
               Picks a starting point for your target role below — feel free to edit it after.
             </p>
             <DomainCards
@@ -126,41 +156,38 @@ export default function Practice() {
             />
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="label-mono">Target role</label>
-              <input
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                placeholder="e.g. Software Engineer, Data Analyst"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="label-mono">Target company (optional)</label>
-              <input
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="e.g. TCS, Infosys, or leave blank"
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground"
-              />
+          <div className={styles.section}>
+            <div className={styles.fieldGrid}>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Target role</label>
+                <input
+                  value={role}
+                  onChange={(e) => setRole(e.target.value)}
+                  placeholder="e.g. Software Engineer, Data Analyst"
+                  className={styles.input}
+                />
+              </div>
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Target company (optional)</label>
+                <input
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  placeholder="e.g. TCS, Infosys, or leave blank"
+                  className={styles.input}
+                />
+              </div>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="label-mono">Experience level</label>
-            <div className="grid grid-cols-3 gap-2">
+          <div className={styles.section}>
+            <p className={styles.sectionLabel}>Experience level</p>
+            <div className={styles.levelGroup}>
               {LEVELS.map((l) => (
                 <button
                   key={l}
                   type="button"
                   onClick={() => setLevel(l)}
-                  className={`rounded-md border px-3 py-2 text-sm transition-colors ${
-                    level === l
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`${styles.levelBtn} ${level === l ? styles.levelBtnActive : ""}`}
                 >
                   {l}
                 </button>
@@ -168,82 +195,100 @@ export default function Practice() {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="label-mono">Interviewer personality</label>
-            <p className="text-sm text-muted-foreground/70">
+          <div className={styles.section}>
+            <p className={styles.sectionLabel}>Interviewer personality</p>
+            <p className={styles.sectionHint}>
               Shapes the tone of follow-up questions and how strictly your answers are scored.
             </p>
-            <div className="grid sm:grid-cols-3 gap-2">
-              {INTERVIEWER_PERSONALITIES.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => setInterviewerPersonality(p.id)}
-                  className={`text-left rounded-md border px-3 py-2 transition-colors ${
-                    interviewerPersonality === p.id
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <p className="text-sm font-medium">{p.title}</p>
-                  <p
-                    className={`text-xs mt-0.5 ${
-                      interviewerPersonality === p.id ? "text-background/70" : "text-muted-foreground/70"
-                    }`}
+            <div className={styles.personalityGrid}>
+              {INTERVIEWER_PERSONALITIES.map((p, i) => {
+                const accent = personalityAccent(p.id, i);
+                const selected = interviewerPersonality === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setInterviewerPersonality(p.id)}
+                    className={styles.personalityCard}
+                    style={{
+                      borderColor: selected ? accent.borderHover : accent.border,
+                      background: selected ? accent.wash : "#fafafa",
+                    }}
                   >
-                    {p.description}
-                  </p>
-                </button>
-              ))}
+                    <p className={styles.personalityTitle}>
+                      <span className={styles.personalityDot} style={{ background: accent.dot }} />
+                      {p.title}
+                    </p>
+                    <p className={styles.personalityDesc}>{p.description}</p>
+                    {selected && (
+                      <span className={styles.personalitySelected} style={{ color: accent.borderHover }}>
+                        ✓ Selected
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={panelMode}
-                onChange={(e) => setPanelMode(e.target.checked)}
-                className="h-4 w-4 accent-foreground"
-              />
-              <span className="label-mono">Panel interview (2 interviewers)</span>
-            </label>
-            <p className="text-sm text-muted-foreground/70 pl-6">
-              A technical and a behavioral interviewer alternate questions in the same session,
-              instead of one interviewer asking everything.
-              {panelMode && (
-                <span className="block mt-1">
-                  Note: the question mix will be balanced across categories while this is on, so
-                  both interviewers get a turn — your Interview Type selection above won't skew it.
-                </span>
-              )}
-            </p>
+          <div className={styles.section}>
+            <div className={styles.toggleRow}>
+              <span className={styles.toggleSwitch}>
+                <input
+                  type="checkbox"
+                  checked={panelMode}
+                  onChange={(e) => setPanelMode(e.target.checked)}
+                  id="panelMode"
+                />
+                <span className={styles.toggleTrack} />
+              </span>
+              <div className={styles.toggleCopy}>
+                <label htmlFor="panelMode" className={styles.toggleTitle}>
+                  Panel interview (2 interviewers)
+                </label>
+                <p className={styles.toggleDesc}>
+                  A technical and a behavioral interviewer alternate questions in the same session,
+                  instead of one interviewer asking everything.
+                  {panelMode && (
+                    <span className={styles.toggleNote}>
+                      Note: the question mix will be balanced across categories while this is on, so
+                      both interviewers get a turn — your Interview Type selection above won&apos;t skew it.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <ResumeUpload
-            onExtracted={(text) => setResumeText(text)}
-            onClear={() => setResumeText(null)}
-          />
+          <div className={styles.section}>
+            <ResumeUpload
+              onExtracted={(text) => setResumeText(text)}
+              onClear={() => setResumeText(null)}
+            />
+          </div>
 
-          <Button onClick={handleStart} disabled={!canStart} className="w-full">
-            {loading ? "Building your interview..." : "Start Practice Interview"}
-          </Button>
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={!canStart}
+            className={styles.submitBtn}
+          >
+            {loading && <Loader2 size={16} className={styles.spinner} />}
+            {loading ? "Building your interview…" : "Start Practice Interview"}
+          </button>
 
           {!interviewType && !error && (
-            <p className="text-sm text-muted-foreground/70 text-center">
-              Pick an interview type above to enable this button.
-            </p>
+            <p className={styles.helperText}>Pick an interview type above to enable this button.</p>
           )}
 
-          {error && <p className="text-sm text-destructive text-center">{error}</p>}
-
-          <p className="text-sm text-muted-foreground/70 text-center">
-            <a href="/" className="hover:underline">
-              ← Back to home
-            </a>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+          {error && (
+            <p className={styles.errorMsg}>
+              <AlertCircle size={14} />
+              {error}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

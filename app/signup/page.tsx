@@ -3,13 +3,28 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { Playfair_Display, Inter, Caveat } from "next/font/google";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff, Loader2, AlertCircle, MailCheck } from "lucide-react";
+import styles from "./page.module.css";
 
-const inputClass =
-  "w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring/40 focus:border-foreground";
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-playfair",
+});
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-inter",
+});
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["600"],
+  variable: "--font-caveat",
+});
 
 export default function Signup() {
   const router = useRouter();
@@ -45,50 +60,59 @@ export default function Signup() {
   }
 
   return (
-    <main className="min-h-screen bg-background flex items-center justify-center px-4">
-      <Card className="max-w-sm w-full overflow-hidden pt-0">
-        <div className="flex gap-1.5 px-6 pt-4 pb-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="w-1.5 h-1.5 rounded-full bg-background border border-border"
-            />
-          ))}
-        </div>
-        <CardHeader>
-          <p className="label-mono mb-1">New recruiter</p>
-          <CardTitle className="text-xl">Create account</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className={`${playfair.variable} ${inter.variable} ${caveat.variable} ${styles.page}`}>
+      <nav className={styles.topNav}>
+        <Link href="/" className={styles.logo}>
+          <span className={styles.logoBadge}>AI</span>
+          Interview Booth
+        </Link>
+        <Link href="/" className={styles.backHome}>← Back to home</Link>
+      </nav>
+
+      <div className={styles.authWrap}>
+        <span className={styles.heroNote}>hello!</span>
+
+        <div className={styles.authCard}>
+          <span className={styles.eyebrow}>New recruiter</span>
+          <h1>Create account</h1>
+          {!checkEmail && (
+            <p className={styles.authSub}>
+              Generate tailored interviews and share them with candidates in minutes.
+            </p>
+          )}
+
           {checkEmail ? (
-            <div className="text-center py-4 space-y-2">
-              <MailCheck className="h-8 w-8 text-verified mx-auto" />
-              <p className="text-sm text-muted-foreground">
-                Account created. Check your email to confirm before logging in.
-              </p>
+            <div className={styles.successBox}>
+              <div className={styles.successIconWrap}>
+                <MailCheck size={22} />
+              </div>
+              <p>Account created. Check your email to confirm before logging in.</p>
             </div>
           ) : (
             <>
-              <div className="space-y-2">
-                <label className="label-mono">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={inputClass}
-                  placeholder="you@company.com"
-                  autoComplete="email"
-                />
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Email</label>
+                <div className={styles.inputWrap}>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={styles.input}
+                    placeholder="you@company.com"
+                    autoComplete="email"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <label className="label-mono">Password</label>
-                <div className="relative">
+
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Password</label>
+                <div className={styles.inputWrap}>
                   <input
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleSignup()}
-                    className={`${inputClass} pr-10`}
+                    className={`${styles.input} ${styles.inputPassword}`}
                     placeholder="At least 6 characters"
                     autoComplete="new-password"
                   />
@@ -96,49 +120,39 @@ export default function Signup() {
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
                     tabIndex={-1}
-                    className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-foreground transition-colors"
+                    className={styles.eyeToggle}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
               </div>
 
-              <Button
+              <button
+                type="button"
                 onClick={handleSignup}
                 disabled={loading || !email || password.length < 6}
-                className="w-full"
+                className={styles.submitBtn}
               >
-                {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {loading ? "Creating account..." : "Sign Up"}
-              </Button>
+                {loading && <Loader2 size={16} className={styles.spinner} />}
+                {loading ? "Creating account…" : "Sign Up"}
+              </button>
 
               {error && (
-                <p className="flex items-center justify-center gap-1.5 text-sm text-destructive text-center">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                <p className={styles.errorMsg}>
+                  <AlertCircle size={14} />
                   {error}
                 </p>
               )}
             </>
           )}
 
-          <p className="text-sm text-muted-foreground text-center">
+          <p className={styles.footNote}>
             Already have an account?{" "}
-            <a href="/login" className="text-seal hover:underline font-medium">
-              Log in
-            </a>
+            <Link href="/login" className={styles.footLink}>Log in</Link>
           </p>
-          <p className="text-sm text-muted-foreground/70 text-center">
-            <a href="/" className="hover:underline">
-              ← Back to home
-            </a>
-          </p>
-        </CardContent>
-      </Card>
-    </main>
+        </div>
+      </div>
+    </div>
   );
 }

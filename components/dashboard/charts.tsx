@@ -391,3 +391,256 @@ export function SubjectDonut({ subjects }: { subjects: SubjectScore[] }) {
     </div>
   );
 }
+
+// GitHub-style practice calendar — built entirely client-side from each
+// attempt's createdAt timestamp, no new API needed. Shows the last 10 weeks;
+// darker squares mean more attempts logged that day.
+export function ConsistencyCalendar({ attempts }: { attempts: CandidateAttempt[] }) {
+  const dayCounts = new Map<string, number>();
+  attempts.forEach((a) => {
+    const key = new Date(a.createdAt).toDateString();
+    dayCounts.set(key, (dayCounts.get(key) || 0) + 1);
+  });
+
+  const totalDays = 70; // 10 weeks
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days: { date: Date; count: number }[] = [];
+  for (let i = totalDays - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push({ date: d, count: dayCounts.get(d.toDateString()) || 0 });
+  }
+
+  const weeks: { date: Date; count: number }[][] = [];
+  for (let i = 0; i < days.length; i += 7) {
+    weeks.push(days.slice(i, i + 7));
+  }
+
+  function levelClass(count: number) {
+    if (count === 0) return "bg-muted";
+    if (count === 1) return "bg-seal/40";
+    if (count === 2) return "bg-seal/70";
+    return "bg-seal";
+  }
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {weeks.map((week, wi) => (
+          <div key={wi} className="flex flex-col gap-1 shrink-0">
+            {week.map((day, di) => (
+              <div
+                key={di}
+                title={`${day.date.toLocaleDateString()} — ${day.count} attempt${day.count === 1 ? "" : "s"}`}
+                className={`w-3 h-3 rounded-sm ${levelClass(day.count)}`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center gap-1.5 label-mono text-muted-foreground/60">
+        <span>Less</span>
+        <span className="w-3 h-3 rounded-sm bg-muted inline-block" />
+        <span className="w-3 h-3 rounded-sm bg-seal/40 inline-block" />
+        <span className="w-3 h-3 rounded-sm bg-seal/70 inline-block" />
+        <span className="w-3 h-3 rounded-sm bg-seal inline-block" />
+        <span>More</span>
+      </div>
+    </div>
+  );
+}
+
+export interface Achievement {
+  label: string;
+  description: string;
+  achieved: boolean;
+}
+
+// Milestone badges — purely derived from data the page already has
+// (attempt count, streak, best score). No fabricated claims, just simple
+// thresholds on real numbers.
+export function AchievementGrid({ achievements }: { achievements: Achievement[] }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {achievements.map((a) => (
+        <div
+          key={a.label}
+          className={`rounded-lg border p-3.5 text-center space-y-1 transition-colors ${
+            a.achieved ? "border-seal bg-accent" : "border-border bg-muted/30 opacity-60"
+          }`}
+        >
+          <p className={`text-sm font-semibold ${a.achieved ? "text-accent-foreground" : "text-muted-foreground"}`}>
+            {a.label}
+          </p>
+          <p className="text-xs text-muted-foreground">{a.description}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Skill radar — up to ~6 subjects plotted as a polygon on concentric rings.
+// Falls back to a message rather than a distorted 1- or 2-point shape when
+// there isn't enough subject variety to make a meaningful polygon.
+export function RadarChart({ subjects }: { subjects: SubjectScore[] }) {
+  if (subjects.length < 3) {
+    return (
+      <p className="text-sm text-muted-foreground text-center py-8">
+        Need at least 3 distinct subjects scored to draw a radar chart — keep practicing across
+        different question types to unlock this.
+      </p>
+    );
+  }
+
+  const size = 220;
+  const cx = size / 2;
+  const cy = size / 2;
+  const maxR = 84;
+  const n = subjects.length;
+  const angleFor = (i: number) => (Math.PI * 2 * i) / n - Math.PI / 2;
+
+  // subjects.average is on the same 0–10 scale used elsewhere (scoreColor,
+  // ScoreHistoryChart's 0–10 axis) — clamp defensively.
+  const pointFor = (i: number, value: number) => {
+    const r = (Math.max(0, Math.min(10, value)) / 10) * maxR;
+    const angle = angleFor(i);
+    return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+  };
+
+  const polygonPoints = subjects.map((s, i) => pointFor(i, s.average)).map((p) => `${p.x},${p.y}`).join(" ");
+  const ringLevels = [0.25, 0.5, 0.75, 1];
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {ringLevels.map((level) => {
+          const ringPoints = subjects
+            .map((_, i) => {
+              const angle = angleFor(i);
+              const r = maxR * level;
+              return `${cx + r * Math.cos(angle)},${cy + r * Math.sin(angle)}`;
+            })
+            .join(" ");
+          return (
+            <polygon
+              key={level}
+              points={ringPoints}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1}
+              className="text-border"
+            />
+          );
+        })}
+        {subjects.map((_, i) => {
+          const angle = angleFor(i);
+          return (
+            <line
+              key={i}
+              x1={cx}
+              y1={cy}
+              x2={cx + maxR * Math.cos(angle)}
+              y2={cy + maxR * Math.sin(angle)}
+              stroke="currentColor"
+              strokeWidth={1}
+              className="text-border"
+            />
+          );
+        })}
+        <polygon points={polygonPoints} fill="currentColor" fillOpacity={0.18} stroke="currentColor" strokeWidth={2} className="text-seal" />
+        {subjects.map((s, i) => {
+          const p = pointFor(i, s.average);
+          return <circle key={s.subject} cx={p.x} cy={p.y} r={3} fill="currentColor" className="text-seal" />;
+        })}
+        {subjects.map((s, i) => {
+          const angle = angleFor(i);
+          const labelR = maxR + 22;
+          const x = cx + labelR * Math.cos(angle);
+          const y = cy + labelR * Math.sin(angle);
+          return (
+            <text
+              key={s.subject}
+              x={x}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontSize={9}
+              className="fill-muted-foreground"
+            >
+              {s.subject.length > 14 ? `${s.subject.slice(0, 12)}…` : s.subject}
+            </text>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+// Horizontal bars per subject — same subjectAgg data as RadarChart and
+// SubjectStamp, just a more scannable list layout.
+export function SubjectProgressBars({ subjects }: { subjects: SubjectScore[] }) {
+  return (
+    <div className="space-y-3">
+      {subjects.map((s) => {
+        const pct = (Math.max(0, Math.min(10, s.average)) / 10) * 100;
+        return (
+          <div key={s.subject} className="space-y-1">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-foreground">{s.subject}</span>
+              <span className={`font-mono text-xs font-medium ${scoreColor(s.average)}`}>
+                {toDisplayScore(s.average)}/100
+              </span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div className="h-full rounded-full bg-seal" style={{ width: `${pct}%` }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Score distribution histogram — five fixed bands on the 0–100 display
+// scale, so the shape is comparable across candidates regardless of how
+// many attempts they have.
+export function ScoreHistogram({ scores }: { scores: number[] }) {
+  if (scores.length === 0) return null;
+  const bands = [
+    { label: "0–20", min: 0, max: 20 },
+    { label: "20–40", min: 20, max: 40 },
+    { label: "40–60", min: 40, max: 60 },
+    { label: "60–80", min: 60, max: 80 },
+    { label: "80–100", min: 80, max: 101 },
+  ];
+  const displayScores = scores.map((s) => toDisplayScore(s));
+  const counts = bands.map((b) => displayScores.filter((s) => s >= b.min && s < b.max).length);
+  const maxCount = Math.max(...counts, 1);
+
+  return (
+    <div className="flex items-end gap-3 h-32">
+      {bands.map((b, i) => (
+        <div key={b.label} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+          <span className="label-mono text-muted-foreground/70">{counts[i]}</span>
+          <div
+            className="w-full rounded-t-md bg-seal transition-all"
+            style={{ height: `${(counts[i] / maxCount) * 100}%`, minHeight: counts[i] > 0 ? 4 : 0 }}
+          />
+          <span className="label-mono text-muted-foreground/60">{b.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Compact inline bar for list rows (Past Attempts) — same scale/coloring
+// language as SubjectProgressBars, sized for a single-line row.
+export function MiniScoreBar({ score }: { score: number }) {
+  const pct = (Math.max(0, Math.min(10, score)) / 10) * 100;
+  return (
+    <div className="h-1.5 w-20 rounded-full bg-muted overflow-hidden shrink-0">
+      <div className={`h-full rounded-full ${scoreColor(score).replace("text-", "bg-")}`} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}

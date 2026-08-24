@@ -1,0 +1,128 @@
+/* TARGET PATH: components/voice/MicCheckCard.module.css */
+
+.panel {
+  background: #fafafa;
+  border: 1.5px solid #ececec;
+  border-radius: 20px;
+  padding: 24px 22px;
+}
+
+.headRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.headLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(20, 20, 20, 0.45);
+}
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 30px;
+  padding: 5px 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.statusPillReady {
+  background: #eefac0;
+  color: #2f6e51;
+  border: 1px solid rgba(47, 110, 81, 0.25);
+}
+.statusPillFallback {
+  background: #fdf0d5;
+  color: #8a6416;
+  border: 1px solid rgba(200, 155, 60, 0.35);
+}
+
+/* ===== Mic button ===== */
+.micArea {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 0 18px;
+}
+.micBtn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #111;
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .2s ease;
+}
+.micBtn:active { transform: scale(0.95); }
+.micBtn:disabled { cursor: default; }
+.micBtnBusy {
+  box-shadow: 0 0 0 8px rgba(111, 224, 192, 0.28);
+}
+.prompt {
+  text-align: center;
+  font-size: 14px;
+  font-style: italic;
+  color: rgba(20, 20, 20, 0.65);
+  max-width: 320px;
+}
+
+/* ===== Waveform ===== */
+.waveform {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5px;
+  height: 56px;
+  margin: 10px 0 14px;
+}
+.bar {
+  width: 7px;
+  border-radius: 3px;
+  transition: height 100ms ease;
+}
+
+/* ===== Status line ===== */
+.statusLine {
+  min-height: 22px;
+  text-align: center;
+  font-size: 13.5px;
+}
+.statusIdleWarn { color: #a63d40; }
+.statusMuted { color: rgba(20, 20, 20, 0.5); }
+.statusListening { color: #1f8f74; font-weight: 600; }
+.statusSuccess { color: #2f6e51; font-weight: 600; }
+.statusError { color: #a63d40; }
+.retryLink {
+  text-decoration: underline;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: inherit;
+  font-family: inherit;
+  padding: 0;
+}
+
+.cancelBtn {
+  display: block;
+  margin: 10px auto 0;
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: rgba(20, 20, 20, 0.45);
+  text-decoration: underline;
+  cursor: pointer;
+  font-family: inherit;
+}
+.cancelBtn:hover { color: #111; }

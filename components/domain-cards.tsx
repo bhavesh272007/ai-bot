@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
+import styles from "./domain-cards.module.css";
 
 export interface Domain {
   id: string;
@@ -48,38 +49,30 @@ interface DomainCardsProps {
 // onSelect — used on the practice page.
 export function DomainCards({ mode, selectedId, onSelect }: DomainCardsProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div className={styles.grid}>
       {DOMAINS.map((domain) => {
         const Icon = domain.icon;
         const isSelected = mode === "select" && selectedId === domain.id;
 
         const cardContent = (
           <>
-            <div
-              className={`shrink-0 w-9 h-9 rounded-full border flex items-center justify-center transition-colors ${
-                isSelected ? "border-seal bg-seal/10 text-seal" : "border-border text-muted-foreground"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
+            <div className={`${styles.iconWrap} ${isSelected ? styles.iconWrapSelected : ""}`}>
+              <Icon size={16} strokeWidth={1.75} />
             </div>
-            <div className="min-w-0 text-left">
-              <p className="font-heading font-medium text-sm text-foreground truncate">
-                {domain.label}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">{domain.description}</p>
+            <div className={styles.text}>
+              <p className={styles.label}>{domain.label}</p>
+              <p className={styles.desc}>{domain.description}</p>
             </div>
           </>
         );
 
-        const baseClasses =
-          "flex items-center gap-3 rounded-lg border px-3.5 py-3 transition-colors";
+        const cardClass = `${styles.card} ${mode === "select" ? styles.cardInteractive : ""} ${
+          isSelected ? styles.cardSelected : ""
+        }`;
 
         if (mode === "showcase") {
           return (
-            <div
-              key={domain.id}
-              className={`${baseClasses} border-border hover:border-foreground/30 hover:bg-muted/40`}
-            >
+            <div key={domain.id} className={cardClass}>
               {cardContent}
             </div>
           );
@@ -90,11 +83,7 @@ export function DomainCards({ mode, selectedId, onSelect }: DomainCardsProps) {
             key={domain.id}
             type="button"
             onClick={() => onSelect?.(domain)}
-            className={`${baseClasses} text-left ${
-              isSelected
-                ? "border-seal bg-seal/5 ring-1 ring-seal"
-                : "border-border hover:border-foreground/30 hover:bg-muted/40"
-            }`}
+            className={cardClass}
           >
             {cardContent}
           </button>

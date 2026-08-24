@@ -1,0 +1,252 @@
+/* TARGET PATH: app/signup/page.module.css */
+
+.page {
+  font-family: var(--font-inter), sans-serif;
+  color: #111111;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(circle at 50% 0%, #f2ff6b 0%, #d4f24f 16%, transparent 42%),
+    linear-gradient(180deg, #c6f24a 0%, #a3ec5c 16%, #7fe3a0 32%, #6fe0c0 46%, #7fe8dd 58%, #cdf3ec 74%, #ffffff 92%);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Top bar ===== */
+.topNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 60px;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  color: #111111;
+  text-decoration: none;
+}
+.logoBadge {
+  width: 24px;
+  height: 24px;
+  background: #111;
+  color: #fff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-style: italic;
+  font-family: var(--font-playfair), serif;
+}
+.backHome {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-decoration: none;
+  opacity: 0.8;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.backHome:hover { opacity: 1; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ===== Centered auth area ===== */
+.authWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 24px 80px;
+  position: relative;
+}
+.heroNote {
+  position: absolute;
+  top: -2px;
+  right: 50%;
+  margin-right: -190px;
+  font-family: var(--font-caveat), cursive;
+  font-size: 21px;
+  font-weight: 600;
+  color: #a63d40;
+  transform: rotate(8deg);
+}
+
+/* ===== Auth card ===== */
+.authCard {
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 24px;
+  padding: 40px 36px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.08);
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #eefac0;
+  color: #2f6e51;
+  border: 1px solid rgba(47, 110, 81, 0.25);
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 18px;
+}
+.authCard h1 {
+  font-family: var(--font-playfair), serif;
+  font-weight: 500;
+  font-size: 32px;
+  letter-spacing: -0.01em;
+  color: #161616;
+  margin-bottom: 8px;
+}
+.authSub {
+  font-size: 14px;
+  color: rgba(20, 20, 20, 0.55);
+  line-height: 1.55;
+  margin-bottom: 28px;
+}
+
+/* ===== Form ===== */
+.field { margin-bottom: 18px; }
+.fieldLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(20, 20, 20, 0.45);
+  margin-bottom: 8px;
+}
+.inputWrap { position: relative; }
+.input {
+  width: 100%;
+  background: #fafafa;
+  border: 1.5px solid #ececec;
+  border-radius: 14px;
+  padding: 13px 16px;
+  font-size: 14.5px;
+  font-family: inherit;
+  color: #111;
+  transition: border-color .15s ease, background .15s ease;
+}
+.input::placeholder { color: rgba(20, 20, 20, 0.35); }
+.input:focus {
+  outline: none;
+  border-color: #7fe3a0;
+  background: #fff;
+}
+.inputPassword { padding-right: 44px; }
+.eyeToggle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(20, 20, 20, 0.4);
+}
+.eyeToggle:hover { color: #111; }
+
+/* ===== Submit button (pill, matches btnStart) ===== */
+.submitBtn {
+  width: 100%;
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 15px 22px;
+  border-radius: 30px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.submitBtn:hover:not(:disabled) { transform: translateY(-1px); }
+.submitBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.spinner { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== Error ===== */
+.errorMsg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #a63d40;
+  text-align: center;
+  margin-top: 16px;
+}
+
+/* ===== Success (signup email check) ===== */
+.successBox {
+  text-align: center;
+  padding: 12px 0 4px;
+}
+.successIconWrap {
+  width: 48px; height: 48px;
+  background: #e8fbb8;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2f6e51;
+  margin: 0 auto 16px;
+}
+.successBox p {
+  font-size: 14px;
+  color: rgba(20, 20, 20, 0.6);
+  line-height: 1.6;
+  max-width: 280px;
+  margin: 0 auto;
+}
+
+/* ===== Footer links inside card ===== */
+.footNote {
+  font-size: 13.5px;
+  color: rgba(20, 20, 20, 0.55);
+  text-align: center;
+  margin-top: 26px;
+}
+.footLink {
+  color: #111;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.footNoteSecondary {
+  font-size: 12.5px;
+  color: rgba(20, 20, 20, 0.4);
+  text-align: center;
+  margin-top: 12px;
+}
+.footNoteSecondary a { color: inherit; text-decoration: none; }
+.footNoteSecondary a:hover { text-decoration: underline; }
+
+@media (max-width: 600px) {
+  .topNav { padding: 22px 24px; }
+  .authCard { padding: 32px 24px; border-radius: 20px; }
+  .authCard h1 { font-size: 27px; }
+  .heroNote { display: none; }
+}

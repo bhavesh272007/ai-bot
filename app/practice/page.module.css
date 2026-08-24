@@ -1,0 +1,360 @@
+/* TARGET PATH: app/practice/page.module.css */
+
+.page {
+  font-family: var(--font-inter), sans-serif;
+  color: #111111;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(circle at 50% 0%, #f2ff6b 0%, #d4f24f 10%, transparent 26%),
+    linear-gradient(180deg, #c6f24a 0%, #a3ec5c 6%, #7fe3a0 11%, #6fe0c0 15%, #7fe8dd 18%, #cdf3ec 22%, transparent 30%),
+    radial-gradient(circle at 50% 100%, #f2ff6b 0%, #d4f24f 10%, transparent 26%),
+    linear-gradient(0deg, #c6f24a 0%, #a3ec5c 6%, #7fe3a0 11%, #6fe0c0 15%, #7fe8dd 18%, #cdf3ec 22%, transparent 30%),
+    #ffffff;
+  background-repeat: no-repeat;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== Top bar ===== */
+.topNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28px 60px;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  color: #111111;
+  text-decoration: none;
+}
+.logoBadge {
+  width: 24px;
+  height: 24px;
+  background: #111;
+  color: #fff;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-style: italic;
+  font-family: var(--font-playfair), serif;
+}
+.backHome {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-decoration: none;
+  opacity: 0.8;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.backHome:hover { opacity: 1; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ===== Centered wrap ===== */
+.wrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 12px 24px 80px;
+}
+
+/* ===== Big card ===== */
+.card {
+  background: #fff;
+  border: 1px solid #ececec;
+  border-radius: 28px;
+  padding: 48px;
+  width: 100%;
+  max-width: 880px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.08);
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #eefac0;
+  color: #2f6e51;
+  border: 1px solid rgba(47, 110, 81, 0.25);
+  padding: 6px 14px;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 18px;
+}
+.card h1 {
+  font-family: var(--font-playfair), serif;
+  font-weight: 500;
+  font-size: 36px;
+  letter-spacing: -0.01em;
+  color: #161616;
+  margin-bottom: 12px;
+}
+.intro {
+  font-size: 15px;
+  color: rgba(20, 20, 20, 0.6);
+  line-height: 1.65;
+  max-width: 620px;
+  margin-bottom: 40px;
+}
+
+/* ===== Sections ===== */
+.section {
+  margin-bottom: 36px;
+  padding-top: 36px;
+  border-top: 1px solid #f0f0f0;
+}
+.section:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(20, 20, 20, 0.45);
+  margin-bottom: 6px;
+}
+.sectionHint {
+  font-size: 13.5px;
+  color: rgba(20, 20, 20, 0.5);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.sectionLabel + .fieldGrid,
+.sectionLabel + .levelGroup,
+.sectionLabel + .personalityGrid {
+  margin-top: 16px;
+}
+
+/* ===== Text inputs ===== */
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.field { display: flex; flex-direction: column; gap: 8px; }
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(20, 20, 20, 0.45);
+}
+.input {
+  width: 100%;
+  background: #fafafa;
+  border: 1.5px solid #ececec;
+  border-radius: 14px;
+  padding: 13px 16px;
+  font-size: 14.5px;
+  font-family: inherit;
+  color: #111;
+  transition: border-color .15s ease, background .15s ease;
+}
+.input::placeholder { color: rgba(20, 20, 20, 0.35); }
+.input:focus {
+  outline: none;
+  border-color: #7fe3a0;
+  background: #fff;
+}
+
+/* ===== Experience level pills ===== */
+.levelGroup {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.levelBtn {
+  border: 1.5px solid #ececec;
+  background: #fafafa;
+  color: rgba(20, 20, 20, 0.6);
+  padding: 12px 14px;
+  border-radius: 30px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.levelBtn:hover { border-color: #d8d8d8; color: #111; }
+.levelBtnActive,
+.levelBtnActive:hover {
+  background: #111;
+  border-color: #111;
+  color: #fff;
+}
+
+/* ===== Interviewer personality cards ===== */
+.personalityGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.personalityCard {
+  text-align: left;
+  border: 1.5px solid #ececec;
+  background: #fafafa;
+  border-radius: 16px;
+  padding: 16px;
+  cursor: pointer;
+  font-family: inherit;
+  position: relative;
+  transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.personalityCard:hover {
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+  transform: translateY(-2px);
+}
+.personalityTitle {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 6px;
+}
+.personalityDot {
+  width: 8px; height: 8px; border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+.personalityDesc {
+  font-size: 12.5px;
+  color: rgba(20, 20, 20, 0.55);
+  line-height: 1.5;
+}
+.personalitySelected {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-top: 10px;
+}
+
+/* ===== Panel mode toggle ===== */
+.toggleRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.toggleSwitch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.toggleSwitch input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+.toggleTrack {
+  position: absolute;
+  inset: 0;
+  background: #e2e2e2;
+  border-radius: 30px;
+  transition: background .2s ease;
+}
+.toggleTrack::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform .2s ease;
+}
+.toggleSwitch input:checked ~ .toggleTrack {
+  background: #2f6e51;
+}
+.toggleSwitch input:checked ~ .toggleTrack::after {
+  transform: translateX(18px);
+}
+.toggleCopy { flex: 1; }
+.toggleTitle {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #111;
+  cursor: pointer;
+}
+.toggleDesc {
+  font-size: 13px;
+  color: rgba(20, 20, 20, 0.5);
+  line-height: 1.55;
+  margin-top: 4px;
+}
+.toggleNote {
+  display: block;
+  margin-top: 6px;
+  color: rgba(20, 20, 20, 0.65);
+}
+
+/* ===== Submit ===== */
+.submitBtn {
+  width: 100%;
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 16px 22px;
+  border-radius: 30px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  transition: opacity .15s ease, transform .15s ease;
+}
+.submitBtn:hover:not(:disabled) { transform: translateY(-1px); }
+.submitBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.spinner { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.helperText {
+  font-size: 13px;
+  color: rgba(20, 20, 20, 0.45);
+  text-align: center;
+  margin-top: 14px;
+}
+.errorMsg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #a63d40;
+  text-align: center;
+  margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+  .topNav { padding: 22px 24px; }
+  .card { padding: 30px 22px; border-radius: 22px; }
+  .card h1 { font-size: 27px; }
+  .fieldGrid { grid-template-columns: 1fr; }
+  .levelGroup { grid-template-columns: 1fr; }
+}
