@@ -1,7 +1,4 @@
 // TARGET PATH: app/api/session-report/[sessionId]/route.ts
-//
-// Requires: npm install pdf-lib
-//
 // Generates a single PDF combining a candidate's Q&A round results and their
 // coding round results (if the coding submission was linked via session_id —
 // see the coding_sessions migration). Streams the PDF back for download.
@@ -82,6 +79,34 @@ interface SessionReportData {
   coding_question: any;
 }
 
+// ---------- Readiness score (mirrors app/candidate/dashboard/page.tsx) ----------
+// This is duplicated rather than imported because it lives client-side on
+// the dashboard and this is a server route with different available data
+// (a single session's report, not the full candidate history already in
+// memory). If the formula in the dashboard ever changes, update both.
+type Trend = "up" | "down" | "flat" | "insufficient";
+const TREND_DEADZONE_PCT = 0.05;
+
+function computeTrend(scoresAsc: number[]): Trend {
+  if (scoresAsc.length < 2) return "insufficient";
+  const prev = scoresAsc[scoresAsc.length - 2];
+  const latest = scoresAsc[scoresAsc.length - 1];
+  const delta = latest - prev;
+  if (prev === 0) return delta > 0 ? "up" : "flat";
+  if (Math.abs(delta) / prev < TREND_DEADZONE_PCT) return "flat";
+  return delta > 0 ? "up" : "down";
+}
+
+// Same weights as computeReadinessScore() in the candidate dashboard: 60%
+// latest score, up to 25% for trend direction, up to 15% for an active
+// streak (capped at a 7-day contribution).
+function computeReadinessScore(latestScore: number, trend: Trend, currentStreak: number): number {
+  const scorePart = toDisplayScore(latestScore) * 0.6;
+  const trendPart = { up: 25, flat: 15, insufficient: 15, down: 5 }[trend];
+  const streakPart = (Math.min(currentStreak, 7) / 7) * 15;
+  return Math.round(Math.min(100, scorePart + trendPart + streakPart));
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -110,6 +135,34 @@ export async function GET(
     const interview = report.interview;
     const codingSession = report.coding_session;
     const codingQuestion = report.coding_question;
+
+    // ---------- Readiness score (best-effort — never blocks the report) ----------
+    // NOTE: assumes session.candidate_email is included in what
+    // get_session_report() returns. If it isn't, this silently skips the
+    // stamp rather than failing — add that column to the function's SELECT
+    // if you want this to actually populate.
+    let readinessScore: number | null = null;
+    if (session?.candidate_email) {
+      try {
+        const [{ data: historyRows }, { data: streakData }] = await Promise.all([
+          supabase.rpc("get_candidate_history", { p_email: session.candidate_email }),
+          supabase.rpc("get_candidate_streak", { p_email: session.candidate_email }),
+        ]);
+
+        const scoresAsc = (historyRows || [])
+          .map((r: any) => r.overall_score)
+          .filter((s: any): s is number => s !== null);
+
+        if (scoresAsc.length > 0) {
+          const latestScore = scoresAsc[scoresAsc.length - 1];
+          const trend = computeTrend(scoresAsc);
+          const currentStreak = streakData?.current_streak ?? 0;
+          readinessScore = computeReadinessScore(latestScore, trend, currentStreak);
+        }
+      } catch (err) {
+        console.error("readiness score computation failed (non-fatal, report continues):", err);
+      }
+    }
 
 
     // ---------- Build PDF ----------
@@ -215,6 +268,22 @@ export async function GET(
       y -= h;
     }
 
+    // Styled distinctly from drawScoreBadge (wider, standalone) so it reads
+    // as a headline stat rather than one of several per-question scores.
+    function drawReadinessStamp(score: number) {
+      ensureSpace(40);
+      const color = scoreColor(score / 10); // scoreColor expects a 0-10 scale
+      page.drawRectangle({ x: MARGIN, y: y - 30, width: 190, height: 32, color, opacity: 1 });
+      page.drawText(`READINESS SCORE: ${score}/100`, {
+        x: MARGIN + 12,
+        y: y - 20,
+        size: 12,
+        font: fontBold,
+        color: PAPER,
+      });
+      y -= 44;
+    }
+
     // ---------- Header ----------
     drawHeaderBar();
 
@@ -229,6 +298,10 @@ export async function GET(
     drawLabel(`Session ${sessionId.slice(0, 8).toUpperCase()}`);
     drawParagraph(context, { size: 11, color: INK, font: fontBold, lineHeight: 16 });
     spacer(10);
+
+    if (readinessScore !== null) {
+      drawReadinessStamp(readinessScore);
+    }
 
     // ---------- Q&A Round ----------
     drawHeading("Question & Answer Round");

@@ -45,6 +45,26 @@ interface RubricAnswer {
   improvements: string;
 }
 
+// Supabase/PostgREST errors carry the information that actually identifies a
+// failure — `code` is the SQLSTATE (42501 = RLS denial, 23503 = FK violation,
+// P0002 = a trigger's SELECT INTO STRICT found no rows, PGRST204 = unknown
+// column), with `details`/`hint` naming the relation or constraint involved.
+// The friendly string on its own is a dead end, so echo the real error back in
+// development. Gated on NODE_ENV because these messages expose schema shape.
+function devErrorDetail(error: unknown): Record<string, unknown> {
+  if (process.env.NODE_ENV === "production") return {};
+
+  const e = error as { code?: string; message?: string; details?: string; hint?: string };
+  return {
+    debug: {
+      code: e?.code ?? null,
+      message: e?.message ?? null,
+      details: e?.details ?? null,
+      hint: e?.hint ?? null,
+    },
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { answers, interviewId, candidateEmail, candidateName, interviewerPersonality } = await req.json();
@@ -186,7 +206,7 @@ Return ONLY a valid JSON object, no markdown formatting, no code fences, no extr
     if (sessionError) {
       console.error("Failed to save session:", sessionError);
       return Response.json(
-        { error: "Failed to save session to database." },
+        { error: "Failed to save session to database.", ...devErrorDetail(sessionError) },
         { status: 500 }
       );
     }
@@ -211,7 +231,7 @@ Return ONLY a valid JSON object, no markdown formatting, no code fences, no extr
     if (answersError) {
       console.error("Failed to save answers:", answersError);
       return Response.json(
-        { error: "Failed to save answers to database." },
+        { error: "Failed to save answers to database.", ...devErrorDetail(answersError) },
         { status: 500 }
       );
     }
