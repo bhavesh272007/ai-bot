@@ -1,14 +1,6 @@
 // TARGET PATH: app/api/candidate-history/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-// NOTE: swap this for whatever anon Supabase client helper you already use
-// elsewhere in the project (e.g. lib/supabase/client.ts), if one exists —
-// this is written standalone so it works regardless.
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabase } from "@/lib/supabase";
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);

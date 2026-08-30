@@ -3,26 +3,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Playfair_Display, Inter, Caveat } from "next/font/google";
 import { MicCheckCard } from "@/components/voice/MicCheckCard";
 import styles from "./page.module.css";
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-playfair",
-});
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-inter",
-});
-const caveat = Caveat({
-  subsets: ["latin"],
-  weight: ["600"],
-  variable: "--font-caveat",
-});
 
 const TIPS = [
   "Find a quiet room — background noise makes speech recognition less reliable.",
@@ -34,7 +16,7 @@ export default function TestVoicePage() {
   const [verified, setVerified] = useState(false);
 
   return (
-    <div className={`${playfair.variable} ${inter.variable} ${caveat.variable} ${styles.page}`}>
+    <div className={styles.page}>
       <nav className={styles.topNav}>
         <Link href="/" className={styles.logo}>
           <span className={styles.logoBadge}>AI</span>

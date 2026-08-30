@@ -1,33 +1,52 @@
 // TARGET PATH: app/layout.tsx
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono, Caveat } from "next/font/google";
+import { Space_Grotesk, IBM_Plex_Sans, IBM_Plex_Mono, Caveat, Playfair_Display, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/lib/theme-provider";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-playfair",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
   weight: ["500", "700"],
   variable: "--font-heading",
+  display: "swap",
 });
 
 const plexSans = IBM_Plex_Sans({
   subsets: ["latin"],
   weight: ["400", "500"],
   variable: "--font-sans",
+  display: "swap",
 });
 
 const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500"],
   variable: "--font-mono",
+  display: "swap",
 });
 
 const caveat = Caveat({
   subsets: ["latin"],
   weight: ["600"],
-  variable: "--font-hand",
+  variable: "--font-caveat",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -65,6 +84,8 @@ export default function RootLayout({
         plexSans.variable,
         plexMono.variable,
         caveat.variable,
+        playfair.variable,
+        inter.variable,
         "font-sans"
       )}
     >
