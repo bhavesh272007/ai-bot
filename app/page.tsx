@@ -97,7 +97,6 @@ export default function LandingPage() {
             Interview Booth
           </div>
           <ul className={styles.navLinks}>
-            <li><a href="#what-we-cover">Practice</a></li>
             <li><a href="#domains">Domains</a></li>
             <li><Link href="/challenge">Weekly Challenge</Link></li>
             <li><a href="#prep-packs">Prep Packs</a></li>
@@ -135,7 +134,6 @@ export default function LandingPage() {
           </p>
           <div className={styles.heroButtons}>
             <Link href="/practice" className={styles.btnStart}>Start Practicing</Link>
-            <Link href="/practice" className={styles.btnSample}>View Sample Questions</Link>
           </div>
         </div>
 
@@ -376,7 +374,6 @@ export default function LandingPage() {
           <p>Start a free practice round right now — no account, no setup, just questions and instant feedback.</p>
           <div className={styles.heroButtons}>
             <Link href="/practice" className={styles.btnStart}>Start Practicing</Link>
-            <Link href="/practice" className={styles.btnSample}>View Sample Questions</Link>
           </div>
         </div>
 

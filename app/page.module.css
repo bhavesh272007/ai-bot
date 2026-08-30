@@ -115,12 +115,55 @@
   transform: translateY(-2px);
   box-shadow: 0 14px 32px rgba(111, 224, 192, 0.55);
 }
+/* Travelling crimson highlight that traces the button's perimeter. A rotating
+   conic-gradient is masked down to a 2px ring so only the border band shows —
+   the gradient itself is mostly transparent, leaving one bright arc that
+   sweeps around the pill. Red rather than white: the button's own background
+   is a light green→mint gradient, so a white arc washed out against it, while
+   crimson is the complement of that green and stays legible across the whole
+   sweep. The angle is a registered custom property because plain custom
+   properties can't be interpolated in a gradient. */
+@property --chatSweep {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.floatingCareerChat::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: conic-gradient(
+    from var(--chatSweep),
+    transparent 0deg,
+    transparent 200deg,
+    rgba(220, 38, 38, 0.35) 268deg,
+    #dc2626 306deg,
+    rgba(220, 38, 38, 0.35) 344deg,
+    transparent 360deg
+  );
+  /* Punch out the middle: keep the border box, drop the content box. */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  filter: drop-shadow(0 0 4px rgba(220, 38, 38, 0.9));
+  pointer-events: none;
+  animation: chatSweepSpin 2.4s linear infinite;
+}
+@keyframes chatSweepSpin {
+  to { --chatSweep: 360deg; }
+}
 @keyframes floatCareerChat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .floatingCareerChat {
+    animation: none;
+  }
+  .floatingCareerChat::before {
     animation: none;
   }
 }

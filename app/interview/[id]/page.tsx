@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,8 +14,12 @@ import { InterviewerAvatar } from "@/components/interviewer-avatar";
 import { CandidateCamera } from "@/components/candidate-camera";
 import { InterviewProgress } from "@/components/interview/InterviewProgress";
 import { MeetingModeCall } from "@/components/interview/meeting-mode-call";
+import { MeetingHandoff } from "@/components/interview/meeting-handoff";
 import { useTextToSpeech } from "@/lib/voice/useTextToSpeech";
 import { useAudioLevel } from "@/lib/voice/useAudioLevel";
+import { useNetworkInfo } from "@/lib/voice/useNetworkInfo";
+import { useVoiceCapture } from "@/lib/voice/useVoiceCapture";
+import { formatElapsed, saveMeetingSession, useElapsedSeconds } from "@/lib/meeting-session";
 import { toDisplayScore } from "@/lib/scoring";
 import { getInterviewerRole, PANEL_ROLE_LABELS, type InterviewerRole } from "@/lib/panel-mode";
 
@@ -44,17 +48,10 @@ interface ScoreResult {
   sessionId?: string;
 }
 
-type Stage = "loading" | "intro" | "interview" | "summary" | "notfound";
-
-// Minimal shapes for the Web Speech API result event (no official TS types needed)
-type SpeechRecognitionResultLike = {
-  isFinal: boolean;
-  0: { transcript: string };
-};
-type SpeechRecognitionEventLike = {
-  resultIndex: number;
-  results: SpeechRecognitionResultLike[] & { length: number };
-};
+// "handoff" is meeting-mode only: the in-call beat between the Q&A round and
+// the coding round, while scoring runs in the background. Classic mode goes
+// straight from "interview" to "summary" as it always has.
+type Stage = "loading" | "intro" | "interview" | "handoff" | "summary" | "notfound";
 
 function scoreColor(score: number) {
   if (score >= 7) return "#2F6E51";
@@ -72,14 +69,8 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-// Meeting-mode elapsed-time display — "4:32" under an hour, "1:04:32" past it.
-function formatElapsed(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-}
+// Meeting-mode elapsed-time display lives in lib/meeting-session.ts — the
+// coding round shows the same clock, driven off the same start timestamp.
 
 // Ranks voices for the picker's default ordering — Indian English first
 // (this is where free browser TTS is actually strong, notably Edge's
@@ -96,9 +87,16 @@ function formatVoiceLabel(v: SpeechSynthesisVoice): string {
 
 const VOICE_PREFERENCE_KEY = "interview-booth-voice-name";
 
+// What the interviewer says on the between-rounds screen. Scripted rather than
+// generated — it's pure stagecraft, so there's no reason to spend an AI call or
+// make the candidate wait on one.
+const HANDOFF_LINE =
+  "That wraps up the discussion round. Let's move on to a short coding exercise — I'll share a problem on my screen in just a moment.";
+
 export default function CandidateInterview() {
   const params = useParams();
   const interviewId = params.id as string;
+  const router = useRouter();
 
   const [stage, setStage] = useState<Stage>("loading");
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -141,10 +139,6 @@ export default function CandidateInterview() {
 
   // ---------- Voice (STT + TTS) state ----------
   const [voiceSupported, setVoiceSupported] = useState(false);
-  const [micSupported, setMicSupported] = useState(false); // native SpeechRecognition present
-  // True if we can capture voice at ALL, either via native recognition or
-  // via record+Whisper fallback. Gates whether the mic button shows.
-  const [voiceInputSupported, setVoiceInputSupported] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true); // auto-read questions aloud
   const [cameraEnabled, setCameraEnabled] = useState(true); // self-view during the interview, never recorded
   // Live-meeting-call skin (Phase 14): dark video-call layout. The question
@@ -170,18 +164,6 @@ export default function CandidateInterview() {
   // Bumped once per TTS word boundary — drives the avatar's speaking pulse.
   // See components/interviewer-avatar.tsx for why this isn't true lip sync.
   const [speakTick, setSpeakTick] = useState(0);
-  const [isListening, setIsListening] = useState(false);
-  // True while the CURRENT listening session is using record+Whisper
-  // instead of live native recognition (no interim transcript in this mode —
-  // the answer fills in only once recording stops and Whisper responds).
-  const [usingFallback, setUsingFallback] = useState(false);
-  const [transcribing, setTranscribing] = useState(false);
-
-  const recognitionRef = useRef<any>(null);
-  const baseAnswerRef = useRef(""); // committed transcript before the current listening session
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const activeStreamRef = useRef<MediaStream | null>(null);
 
   // ---------- Dynamic follow-up (Phase 13) state ----------
   const MAX_FOLLOWUPS = 3; // cap total follow-ups per interview (cost + pacing)
@@ -192,19 +174,29 @@ export default function CandidateInterview() {
   const [followUpCount, setFollowUpCount] = useState(0);
   const [checkingFollowUp, setCheckingFollowUp] = useState(false);
 
+  // ---------- Answer capture (native STT, Whisper fallback, auto-listen) ----------
+  // The whole pipeline lives in lib/voice/useVoiceCapture.ts so the coding
+  // round's think-aloud narration uses the same implementation instead of a
+  // second copy. Auto-listen is meeting-mode only: the keeper restarts the mic
+  // whenever the browser drops it, but waits while the interviewer is speaking,
+  // while the typed-answer panel is open, or while a follow-up is being fetched.
+  const voice = useVoiceCapture({
+    getBaseText: () => currentAnswer,
+    setText: setCurrentAnswer,
+    autoListen: meetingMode && stage === "interview" && micAutoOn,
+    autoListenBlocked: tts.isSpeaking || showTypedAnswer || checkingFollowUp,
+  });
+  const { isListening, transcribing, usingFallback, micSupported, voiceInputSupported } = voice;
+
   // ---------- Meeting-mode header: elapsed time + network info ----------
-  const interviewStartRef = useRef<number | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const [networkInfo, setNetworkInfo] = useState<{
-    downlinkMbps: number | null;
-    rttMs: number | null;
-    quality: string | null;
-  }>({ downlinkMbps: null, rttMs: null, quality: null });
-  // Caps how many times the meeting-mode "keeper" effect will retry starting
-  // the mic for the CURRENT question — resets on every new question (see the
-  // TTS-speak effect below). Without this, a genuinely denied mic permission
-  // would otherwise trigger an endless retry/prompt loop.
-  const micRestartAttemptsRef = useRef(0);
+  // startedAt is a timestamp rather than a counter so the coding round can
+  // resume the SAME clock after the route change (see lib/meeting-session.ts).
+  const [callStartedAt, setCallStartedAt] = useState<number | null>(null);
+  const elapsedSeconds = useElapsedSeconds(
+    callStartedAt,
+    stage === "interview" || stage === "handoff"
+  );
+  const networkInfo = useNetworkInfo();
 
   // The question actually being shown right now — either the next scripted
   // question, or a follow-up probing the answer just given.
@@ -215,6 +207,12 @@ export default function CandidateInterview() {
   const activeRole: InterviewerRole = currentQuestion
     ? getInterviewerRole(currentQuestion.category)
     : "technical";
+  // Who the candidate is talking to, as shown on the call tiles. Also carried
+  // into the coding round via the meeting session so the label doesn't change
+  // halfway through the same conversation.
+  const callRoleLabel = isPanelMode
+    ? PANEL_ROLE_LABELS[activeRole]
+    : targetRole || "Interviewer";
 
   // Pick a default voice once the browser reports its list — remembered
   // choice first, otherwise the highest-ranked available (Indian English
@@ -257,20 +255,10 @@ export default function CandidateInterview() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isListening]);
 
-  // Feature-detect once on mount (must run client-side only)
+  // Feature-detect TTS once on mount (must run client-side only). Mic/STT
+  // support detection lives inside useVoiceCapture.
   useEffect(() => {
     setVoiceSupported(typeof window !== "undefined" && "speechSynthesis" in window);
-    const SpeechRecognitionCtor =
-      typeof window !== "undefined" &&
-      ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-    setMicSupported(!!SpeechRecognitionCtor);
-    // Voice input is usable either through native recognition, or through
-    // plain mic capture + our Whisper fallback endpoint — so this is true
-    // for effectively every modern browser, including Firefox.
-    setVoiceInputSupported(
-      !!SpeechRecognitionCtor ||
-        (typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia)
-    );
   }, []);
 
   useEffect(() => {
@@ -308,7 +296,7 @@ export default function CandidateInterview() {
     if (!currentQuestion) return;
 
     setWordsSpokenInQuestion(0); // fresh caption for the new question
-    micRestartAttemptsRef.current = 0; // fresh mic-retry budget for the new question
+    voice.resetAutoRestarts(); // fresh mic-retry budget for the new question
 
     tts.speak(currentQuestion.question, {
       rate: 1,
@@ -341,93 +329,65 @@ export default function CandidateInterview() {
     return () => clearInterval(id);
   }, [tts.isSpeaking]);
 
-  // Meeting-mode: tick the elapsed-time clock once a second while the
-  // interview is running.
+  // ---------- Handoff: speak the line, warm the route, then navigate ----------
+
+  // Speak the handoff line on arrival. Separate from the question effect above
+  // (which bails once stage leaves "interview") but shares the same caption
+  // counter, so the fallback timer covers it too.
   useEffect(() => {
-    if (stage !== "interview") return;
-    const id = setInterval(() => {
-      if (interviewStartRef.current !== null) {
-        setElapsedSeconds(Math.floor((Date.now() - interviewStartRef.current) / 1000));
-      }
-    }, 1000);
-    return () => clearInterval(id);
-  }, [stage]);
+    if (stage !== "handoff") return;
+    setWordsSpokenInQuestion(0);
+    if (!voiceEnabled || !voiceSupported) return;
 
-  // Meeting-mode: best-effort network stats via the (Chromium-only)
-  // NetworkInformation API. Silently no-ops on browsers that don't expose
-  // navigator.connection (Safari, Firefox) — the header just omits that row.
-  useEffect(() => {
-    const conn = typeof navigator !== "undefined" ? (navigator as any).connection : null;
-    if (!conn) return;
+    tts.speak(HANDOFF_LINE, {
+      rate: 1,
+      voiceName: selectedVoiceName || undefined,
+      onBoundary: () => {
+        setSpeakTick((t) => t + 1);
+        setWordsSpokenInQuestion((w) => w + 1);
+      },
+    });
 
-    function readConnection() {
-      const downlink = typeof conn.downlink === "number" ? conn.downlink : null;
-      const rtt = typeof conn.rtt === "number" ? conn.rtt : null;
-      const effectiveType: string | undefined = conn.effectiveType;
-      const quality =
-        effectiveType === "4g"
-          ? "Good"
-          : effectiveType === "3g"
-          ? "Average"
-          : effectiveType
-          ? "Poor"
-          : null;
-      setNetworkInfo({ downlinkMbps: downlink, rttMs: rtt, quality });
-    }
-
-    readConnection();
-    conn.addEventListener?.("change", readConnection);
-    return () => conn.removeEventListener?.("change", readConnection);
-  }, []);
-
-  // Meeting-mode: mic is on by default. This is a "keeper" effect, not a
-  // one-shot — it re-evaluates every time isListening or tts.isSpeaking
-  // changes, so if native SpeechRecognition times out from silence (browsers
-  // do this even with continuous:true, often within a few seconds) it just
-  // restarts automatically instead of leaving the mic silently dead. A short
-  // debounce avoids hammering getUserMedia if it's restarting rapidly, and a
-  // per-question attempt cap stops it from endlessly re-prompting if
-  // permission was actually denied.
-  useEffect(() => {
-    if (!meetingMode || stage !== "interview") return;
-    if (!voiceInputSupported || !micAutoOn) return;
-    if (tts.isSpeaking || isListening || transcribing || showTypedAnswer || checkingFollowUp) return;
-    if (micRestartAttemptsRef.current >= 8) return;
-
-    const t = setTimeout(() => {
-      micRestartAttemptsRef.current += 1;
-      baseAnswerRef.current = currentAnswer ? currentAnswer.trim() + " " : "";
-      if (micSupported) {
-        startNativeRecognition();
-      } else {
-        startFallbackRecording();
-      }
-    }, 700);
-
-    return () => clearTimeout(t);
+    return () => {
+      tts.cancel();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    meetingMode,
-    stage,
-    voiceInputSupported,
-    micAutoOn,
-    tts.isSpeaking,
-    isListening,
-    transcribing,
-    showTypedAnswer,
-    checkingFollowUp,
-  ]);
+  }, [stage, voiceEnabled, voiceSupported, selectedVoiceName]);
 
-  // Stop any speech/recognition/recording on unmount
+  // Warm the coding route while the interviewer is still talking, so the
+  // dark→dark transition doesn't flash a white loading screen.
+  useEffect(() => {
+    if (stage !== "handoff") return;
+    router.prefetch(`/interview/${interviewId}/coding`);
+  }, [stage, interviewId, router]);
+
+  // Scoring finished in the background — hand the call over to the coding
+  // round. sessionStorage carries the call's details (including startedAt, so
+  // the clock keeps counting) and ?meeting=1 is the explicit signal.
+  useEffect(() => {
+    if (stage !== "handoff" || !scoreResult) return;
+
+    saveMeetingSession(interviewId, {
+      cameraEnabled,
+      voiceEnabled,
+      voiceName: selectedVoiceName || null,
+      micAutoOn,
+      startedAt: callStartedAt ?? Date.now(),
+      roleLabel: callRoleLabel,
+    });
+
+    const query = new URLSearchParams({ meeting: "1" });
+    if (scoreResult.sessionId) query.set("session", scoreResult.sessionId);
+    router.push(`/interview/${interviewId}/coding?${query.toString()}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, scoreResult]);
+
+  // Stop any speech on unmount. Recognition/recording teardown is owned by
+  // useVoiceCapture's own cleanup.
   useEffect(() => {
     return () => {
       tts.cancel();
       audioLevel.stop();
-      recognitionRef.current?.stop();
-      if (mediaRecorderRef.current?.state === "recording") {
-        mediaRecorderRef.current.stop();
-      }
-      activeStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -447,169 +407,17 @@ export default function CandidateInterview() {
     setVoiceEnabled((v) => !v);
   }
 
-  // Record raw audio and send it to our Groq Whisper fallback endpoint.
-  // Used for browsers with no native SpeechRecognition (e.g. Firefox), and
-  // as a mid-answer rescue if native recognition throws an error.
-  async function startFallbackRecording() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      activeStreamRef.current = stream;
-      audioChunksRef.current = [];
-
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
-      const recorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
-      };
-
-      recorder.onstop = async () => {
-        setIsListening(false);
-        stream.getTracks().forEach((t) => t.stop());
-        activeStreamRef.current = null;
-
-        const blob = new Blob(audioChunksRef.current, { type: mimeType });
-        if (blob.size < 1000) return; // essentially silence — nothing worth sending
-
-        setTranscribing(true);
-        try {
-          const formData = new FormData();
-          formData.append("audio", blob, `recording.${mimeType.includes("webm") ? "webm" : "mp4"}`);
-
-          const res = await fetch("/api/transcribe-fallback", { method: "POST", body: formData });
-          if (!res.ok) throw new Error("Transcription failed");
-
-          const data = await res.json();
-          const text = (data.text || "").trim();
-          if (text) {
-            setCurrentAnswer((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
-          }
-        } catch (err) {
-          // Fail quietly — whatever the candidate already typed/said stays
-          // in the box, they can just keep typing or try the mic again.
-        } finally {
-          setTranscribing(false);
-        }
-      };
-
-      recorder.start();
-      setUsingFallback(true);
-      setIsListening(true);
-    } catch (err) {
-      // Mic permission denied or no device available — nothing more to do.
-      setIsListening(false);
-    }
-  }
-
-  function startNativeRecognition() {
-    const SpeechRecognitionCtor =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognitionCtor();
-    recognition.lang = "en-US";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-
-    recognition.onresult = (event: SpeechRecognitionEventLike) => {
-      let interim = "";
-      let final = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          final += transcript + " ";
-        } else {
-          interim += transcript;
-        }
-      }
-      if (final) {
-        baseAnswerRef.current = baseAnswerRef.current + final;
-      }
-      setCurrentAnswer((baseAnswerRef.current + interim).trim());
-      // Proof the mic is actually working — a long answer with several
-      // natural pauses shouldn't ever hit the meeting-mode restart cap.
-      if (final || interim) micRestartAttemptsRef.current = 0;
-    };
-
-    recognition.onerror = (e: any) => {
-      if (e.error === "no-speech" || e.error === "aborted") {
-        setIsListening(false);
-        return;
-      }
-      // Something more disruptive (network drop, permission hiccup) —
-      // rescue the rest of THIS answer with record+Whisper instead of
-      // just dropping the candidate back to typing mid-sentence.
-      recognitionRef.current = null;
-      setIsListening(false);
-      startFallbackRecording();
-    };
-
-    recognition.onend = () => {
-      if (!usingFallback) setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
-    setUsingFallback(false);
-    try {
-      recognition.start();
-      setIsListening(true);
-    } catch {
-      // Most commonly thrown when the browser hasn't fully released the mic
-      // from the PREVIOUS recognition session yet (only one can be active at
-      // a time). Leaving isListening false here (rather than throwing
-      // uncaught) means the meeting-mode keeper effect just quietly retries
-      // on its next debounce tick instead of the mic dying with no signal.
-      recognitionRef.current = null;
-      setIsListening(false);
-    }
-  }
-
-  // Phase 11: STT — mic button transcribes into the same textarea as typing.
-  // Prefers native SpeechRecognition (live, free, no round-trip); falls back
-  // to record+Whisper when native isn't available in this browser.
+  // Phase 11: STT — the mic button transcribes into the same answer string as
+  // typing. Cancels TTS first so the interviewer isn't talking over the
+  // candidate; everything else is the shared capture pipeline's job.
   function toggleListening() {
-    if (!voiceInputSupported) return;
-
-    if (isListening) {
-      if (usingFallback) {
-        mediaRecorderRef.current?.stop();
-      } else {
-        recognitionRef.current?.stop();
-      }
-      return;
-    }
-
-    // Don't let the AI talk over the student
-    tts.cancel();
-
-    // Keep whatever's already typed/transcribed and append to it
-    baseAnswerRef.current = currentAnswer ? currentAnswer.trim() + " " : "";
-
-    if (micSupported) {
-      startNativeRecognition();
-    } else {
-      startFallbackRecording();
-    }
+    if (!isListening) tts.cancel();
+    voice.toggle();
   }
 
   function stopVoiceActivity() {
     tts.cancel();
-    if (isListening) {
-      if (usingFallback) {
-        mediaRecorderRef.current?.stop();
-      } else {
-        recognitionRef.current?.stop();
-      }
-    }
-  }
-
-  // Stops whichever capture path is currently active, without touching TTS.
-  // Shared by the meeting-mode mic toggle and the "type answer" toggle below.
-  function stopListeningNow() {
-    if (usingFallback) {
-      mediaRecorderRef.current?.stop();
-    } else {
-      recognitionRef.current?.stop();
-    }
+    if (isListening) voice.stop();
   }
 
   // Meeting-mode only — flips the auto-listen mic on/off. Turning it off
@@ -618,7 +426,7 @@ export default function CandidateInterview() {
   function toggleMicAuto() {
     setMicAutoOn((prev) => {
       const next = !prev;
-      if (!next && isListening) stopListeningNow();
+      if (!next && isListening) voice.stop();
       return next;
     });
   }
@@ -629,7 +437,7 @@ export default function CandidateInterview() {
   function toggleTypedAnswer() {
     setShowTypedAnswer((prev) => {
       const next = !prev;
-      if (next && isListening) stopListeningNow();
+      if (next && isListening) voice.stop();
       return next;
     });
   }
@@ -641,8 +449,7 @@ export default function CandidateInterview() {
     setActiveFollowUp(null);
     setFollowUpCount(0);
     setReviewingIndex(null);
-    interviewStartRef.current = Date.now();
-    setElapsedSeconds(0);
+    setCallStartedAt(Date.now());
     setStage("interview");
   }
 
@@ -702,7 +509,11 @@ export default function CandidateInterview() {
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      setStage("summary");
+      // Meeting mode never breaks the call to show a score: it holds on the
+      // handoff screen while this same scoring request runs, then walks
+      // straight into the coding round. Feedback for both rounds comes at the
+      // very end. Classic mode keeps showing the summary here as it always has.
+      setStage(meetingMode ? "handoff" : "summary");
       scoreInterview(updatedAnswers);
     }
   }
@@ -812,7 +623,15 @@ export default function CandidateInterview() {
       const data = await res.json();
 
       if (!res.ok) {
-        setScoreError(data.error || "Something went wrong scoring your interview.");
+        // `debug` is only populated outside production (see the devErrorDetail
+        // helper in /api/score-interview) and carries the underlying SQLSTATE.
+        // Log it and append it to the visible message so a DB-side failure is
+        // diagnosable without reading server terminal scrollback.
+        if (data?.debug) console.error("score-interview failed:", data.debug);
+        const debugSuffix = data?.debug?.code
+          ? ` [${data.debug.code}${data.debug.message ? `: ${data.debug.message}` : ""}]`
+          : "";
+        setScoreError((data.error || "Something went wrong scoring your interview.") + debugSuffix);
         return;
       }
 
@@ -822,6 +641,22 @@ export default function CandidateInterview() {
     } finally {
       setScoring(false);
     }
+  }
+
+  // Handoff escape hatch: scoring failed, and the candidate would rather do the
+  // coding round than lose it. Navigating without a sessionId means the coding
+  // result has nothing to attach to — no combined report, no PDF — which the
+  // handoff screen states plainly before they choose it.
+  function continueToCodingWithoutSession() {
+    saveMeetingSession(interviewId, {
+      cameraEnabled,
+      voiceEnabled,
+      voiceName: selectedVoiceName || null,
+      micAutoOn,
+      startedAt: callStartedAt ?? Date.now(),
+      roleLabel: callRoleLabel,
+    });
+    router.push(`/interview/${interviewId}/coding?meeting=1`);
   }
 
   // ---------- LOADING ----------
@@ -1018,6 +853,29 @@ export default function CandidateInterview() {
     );
   }
 
+  // ---------- HANDOFF (meeting mode only) ----------
+  // Held only as long as Q&A scoring takes; the effect above navigates to the
+  // coding round the moment it lands.
+  if (stage === "handoff") {
+    return (
+      <MeetingHandoff
+        elapsedLabel={formatElapsed(elapsedSeconds)}
+        networkInfo={networkInfo}
+        roleLabel={callRoleLabel}
+        lineText={HANDOFF_LINE}
+        revealedWordCount={wordsSpokenInQuestion}
+        avatarState={tts.isSpeaking ? "speaking" : "idle"}
+        speakTick={speakTick}
+        micLevel={audioLevel.level}
+        cameraEnabled={cameraEnabled}
+        scoring={scoring}
+        scoreError={scoreError}
+        onRetry={() => scoreInterview(answers)}
+        onContinueWithoutReport={continueToCodingWithoutSession}
+      />
+    );
+  }
+
   // ---------- INTERVIEW ----------
   if (stage === "interview") {
     const current = currentQuestion;
@@ -1026,9 +884,7 @@ export default function CandidateInterview() {
       return (
         <MeetingModeCall
           category={current.category}
-          roleLabel={
-            isPanelMode ? PANEL_ROLE_LABELS[activeRole] : targetRole || "Interviewer"
-          }
+          roleLabel={callRoleLabel}
           isFollowUp={!!activeFollowUp}
           questionIndex={currentIndex}
           totalQuestions={questions.length}
