@@ -6,7 +6,6 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { Playfair_Display, Inter, Caveat } from "next/font/google";
 import {
   Code2, Network, BarChart3, Brain, Package, Cloud, Globe, Database, ShieldCheck,
   Building2, Layers, Hexagon, Briefcase, Share2, Landmark, Cpu, Smartphone,
@@ -14,23 +13,6 @@ import {
 } from "lucide-react";
 import CareerChatWidget from "@/components/career-chat-widget";
 import styles from "./page.module.css";
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-playfair",
-});
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-inter",
-});
-const caveat = Caveat({
-  subsets: ["latin"],
-  weight: ["600"],
-  variable: "--font-caveat",
-});
 
 const FAQS = [
   {
@@ -106,7 +88,7 @@ export default function LandingPage() {
   const [chatOpen, setChatOpen] = useState(false);
 
   return (
-    <div className={`${playfair.variable} ${inter.variable} ${caveat.variable} ${styles.page}`}>
+    <div className={styles.page}>
       <div className={styles.hero}>
         {/* ---------- NAV (inlined — no site-header.tsx) ---------- */}
         <nav className={styles.siteNav}>

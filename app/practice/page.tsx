@@ -4,30 +4,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Playfair_Display, Inter, Caveat } from "next/font/google";
 import { Loader2, AlertCircle } from "lucide-react";
 import { InterviewTypeCards } from "@/components/interview-type-cards";
 import { DomainCards, type Domain } from "@/components/domain-cards";
 import { ResumeUpload } from "@/components/resume-upload";
 import { INTERVIEWER_PERSONALITIES } from "@/lib/interviewer-personalities";
 import styles from "./page.module.css";
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-playfair",
-});
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-inter",
-});
-const caveat = Caveat({
-  subsets: ["latin"],
-  weight: ["600"],
-  variable: "--font-caveat",
-});
 
 const LEVELS = ["Internship", "Entry-level", "Experienced"] as const;
 
@@ -100,23 +82,30 @@ export default function Practice() {
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
 
       if (!res.ok) {
-        setError(data.error || "Something went wrong.");
+        setError(data?.error || `Server error (${res.status}). Please try again.`);
+        setLoading(false);
+        return;
+      }
+
+      if (!data?.interviewId) {
+        setError("Invalid response received from server.");
         setLoading(false);
         return;
       }
 
       router.push(`/interview/${data.interviewId}`);
     } catch (err) {
-      setError("Failed to reach the server. Please try again.");
+      console.error("Practice start error:", err);
+      setError("Failed to reach the server. Please check your connection and try again.");
       setLoading(false);
     }
   }
 
   return (
-    <div className={`${playfair.variable} ${inter.variable} ${caveat.variable} ${styles.page}`}>
+    <div className={styles.page}>
       <nav className={styles.topNav}>
         <Link href="/" className={styles.logo}>
           <span className={styles.logoBadge}>AI</span>

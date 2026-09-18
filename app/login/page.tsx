@@ -4,27 +4,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Playfair_Display, Inter, Caveat } from "next/font/google";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import styles from "./page.module.css";
-
-const playfair = Playfair_Display({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-playfair",
-});
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-inter",
-});
-const caveat = Caveat({
-  subsets: ["latin"],
-  weight: ["600"],
-  variable: "--font-caveat",
-});
 
 export default function Login() {
   const router = useRouter();
@@ -54,7 +36,7 @@ export default function Login() {
   }
 
   return (
-    <div className={`${playfair.variable} ${inter.variable} ${caveat.variable} ${styles.page}`}>
+    <div className={styles.page}>
       <nav className={styles.topNav}>
         <Link href="/" className={styles.logo}>
           <span className={styles.logoBadge}>AI</span>
