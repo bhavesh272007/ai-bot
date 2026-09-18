@@ -2,6 +2,7 @@
 import Groq from "groq-sdk";
 import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { blendCodingScore } from "@/lib/scoring";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -12,37 +13,12 @@ interface TestResult {
   actualOutput: string;
 }
 
-// Test results are objective ground truth for correctness — they shouldn't be
-// second-guessed by the AI's opinion. Quality/efficiency are genuinely
-// judgment calls, so that's where the AI's evaluation actually adds value.
-const TEST_WEIGHT = 0.6;
-const AI_QUALITY_WEIGHT = 0.4;
-
 // Meeting mode keeps the mic live through the coding round, so the candidate's
 // narration arrives here. It shapes the written feedback only — deliberately
 // NOT the score: raw speech-to-text is noisy, and a quiet-but-correct candidate
 // shouldn't be marked down for a transcription artefact. Long transcripts get
 // truncated so a rambling 20-minute round can't blow out the prompt.
 const THINK_ALOUD_CHAR_LIMIT = 4000;
-
-function blendCodingScore(
-  testsPassed: number,
-  testsTotal: number,
-  codeQuality: number,
-  efficiency: number
-): number {
-  const aiComponent = (codeQuality + efficiency) / 2;
-
-  if (testsTotal <= 0) {
-    // No tests to grade against (shouldn't normally happen) — fall back to
-    // the AI's judgment alone rather than dividing by zero / zeroing the score.
-    return Math.round(Math.max(0, Math.min(10, aiComponent)) * 10) / 10;
-  }
-
-  const testComponent = (testsPassed / testsTotal) * 10;
-  const raw = testComponent * TEST_WEIGHT + aiComponent * AI_QUALITY_WEIGHT;
-  return Math.round(Math.max(0, Math.min(10, raw)) * 10) / 10;
-}
 
 export async function POST(req: NextRequest) {
   try {

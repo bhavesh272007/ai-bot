@@ -285,7 +285,7 @@ export default function LandingPage() {
         <div className={styles.engLeft}>
           <h2>A coding round with real test cases</h2>
           <p>JavaScript, Python, Java, or C++ — write code, run it against real test cases, and get AI feedback on correctness and code quality.</p>
-          <Link className={styles.explore} href="/practice">Try a sample coding round →</Link>
+          <Link className={styles.explore} href="/sample-coding">Try a sample coding round →</Link>
 
           <div className={styles.engFeatures}>
             <div>
