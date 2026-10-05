@@ -53,6 +53,7 @@ import {
   type SubjectScore,
 } from "@/components/dashboard/charts";
 import { toDisplayScore } from "@/lib/scoring";
+import styles from "./page.module.css";
 
 // Raw shape returned by /api/candidate-history (mirrors get_candidate_history()).
 // NOTE: candidate_name assumes the SQL function already selects it — the
@@ -72,9 +73,6 @@ interface CandidateHistoryRow {
   coding_tests_total?: number | null;
   coding_language?: string | null;
 }
-
-const PAGE_GRADIENT =
-  "radial-gradient(circle at 50% 0%, #f2ff6b 0%, #d4f24f 10%, transparent 32%), linear-gradient(180deg, #c6f24a 0%, #a3ec5c 8%, #7fe3a0 16%, #6fe0c0 24%, #7fe8dd 32%, #cdf3ec 42%, #ffffff 56%)";
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", Icon: LayoutDashboard },
@@ -504,7 +502,7 @@ export default function CandidateDashboard() {
   // ---------- Email gate ----------
   if (!submittedEmail) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4 py-12" style={{ background: PAGE_GRADIENT }}>
+      <main className={`min-h-screen flex items-center justify-center px-4 py-12 ${styles.pageBg}`}>
         <Card className="w-full max-w-md">
           <CardHeader>
             <p className="label-mono mb-1">Mark sheet</p>
@@ -658,7 +656,7 @@ export default function CandidateDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen" style={{ background: PAGE_GRADIENT }}>
+    <div className={`flex min-h-screen ${styles.pageBg}`}>
       {/* ---------- SIDEBAR (sticky on desktop, slide-in drawer on mobile) ---------- */}
       <aside
         className={`fixed md:sticky top-0 left-0 h-screen z-40 bg-card border-r border-border flex flex-col shrink-0 transition-all duration-200 w-[232px] ${

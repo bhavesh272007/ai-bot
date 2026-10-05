@@ -1,0 +1,12 @@
+/* TARGET PATH: app/career-chat/page.module.css */
+
+.page {
+  background:
+    radial-gradient(circle at 50% 0%, #f2ff6b 0%, #d4f24f 14%, transparent 38%),
+    linear-gradient(180deg, #c6f24a 0%, #a3ec5c 14%, #7fe3a0 26%, #6fe0c0 36%, #7fe8dd 46%, #cdf3ec 58%, #ffffff 72%);
+}
+:global(.dark) .page {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(6, 52, 56, 0.5) 0%, rgba(10, 74, 78, 0.35) 10%, transparent 30%),
+    linear-gradient(180deg, #040706 0%, #050b0b 14%, #07171d 26%, #0a2a16 36%, #0c3739 46%, #07171d 58%, #040706 72%);
+}
