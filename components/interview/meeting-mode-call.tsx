@@ -1,8 +1,9 @@
 // TARGET PATH: components/interview/meeting-mode-call.tsx
 "use client";
 
-import { Mic, MicOff, Volume2, VolumeX, RotateCcw, Keyboard } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, RotateCcw, Keyboard, Sparkles } from "lucide-react";
 import { InterviewerAvatar } from "@/components/interviewer-avatar";
+import { AnamAvatar } from "@/components/anam-avatar";
 import { CandidateCamera } from "@/components/candidate-camera";
 import {
   MeetingShell,
@@ -19,10 +20,6 @@ interface MeetingModeCallProps {
   questionIndex: number;
   totalQuestions: number;
 
-  // Full question text + how many of its words have been spoken so far —
-  // drives the progressive caption under the interviewer panel. Not a
-  // "question card": it's a live subtitle, revealed in step with the TTS
-  // word-boundary events, the same way a real call's captions work.
   questionText: string;
   revealedWordCount: number;
 
@@ -37,13 +34,9 @@ interface MeetingModeCallProps {
   usingFallback: boolean;
   transcribing: boolean;
 
-  // Mic auto-listen toggle (on by default) — independent of the momentary
-  // isListening state, which reflects whether capture is active right now.
   micAutoOn: boolean;
   onToggleMicAuto: () => void;
 
-  // Shared with the classic layout's answer state — same string whether it
-  // arrived via speech-to-text or typing.
   liveAnswerTranscript: string;
   showTypedAnswer: boolean;
   onToggleTypedAnswer: () => void;
@@ -60,6 +53,11 @@ interface MeetingModeCallProps {
   nextLabel: string;
   onNext: () => void;
   onSkip: () => void;
+
+  anamMode?: boolean;
+  anamSessionToken?: string | null;
+  anamLoading?: boolean;
+  onToggleAnamMode?: () => void;
 }
 
 // The dark "video call" skin for the Q&A stage. All the actual interview logic
@@ -98,6 +96,10 @@ export function MeetingModeCall({
   nextLabel,
   onNext,
   onSkip,
+  anamMode = false,
+  anamSessionToken = null,
+  anamLoading = false,
+  onToggleAnamMode,
 }: MeetingModeCallProps) {
   const questionWords = questionText ? questionText.split(" ") : [];
   const revealedCaption = questionWords.slice(0, revealedWordCount).join(" ");
@@ -111,6 +113,22 @@ export function MeetingModeCall({
       networkInfo={networkInfo}
       controls={
         <>
+          {onToggleAnamMode && (
+            <button
+              type="button"
+              onClick={onToggleAnamMode}
+              title={anamMode ? "Switch to 2D Bot" : "Switch to Anam HD Avatar"}
+              className={`h-11 px-3.5 rounded-full border flex items-center gap-1.5 text-xs font-semibold transition-all ${
+                anamMode
+                  ? "border-indigo-500 bg-indigo-500/25 text-indigo-200 shadow-lg shadow-indigo-500/25 ring-1 ring-indigo-400/50"
+                  : "border-neutral-700 text-neutral-300 hover:bg-neutral-900"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-indigo-400 animate-pulse" />
+              <span>{anamMode ? "✨ Anam HD Active" : "✨ Switch to Anam HD"}</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onReplay}
@@ -206,27 +224,40 @@ export function MeetingModeCall({
               avatar's center, to keep that blend clean while still giving
               the panel some visual depth. */}
           <MeetingTile
-            className="flex-col bg-slate-900 min-h-75 md:min-h-105"
+            className="flex-col bg-slate-900 min-h-75 md:min-h-105 overflow-hidden"
             caption={revealedCaption}
           >
             <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
             <div className="absolute -bottom-16 -left-16 w-72 h-72 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
 
-            <InterviewerAvatar
-              state={avatarState}
-              micLevel={micLevel}
-              speakTick={speakTick}
-              surfaceClassName="fill-slate-900"
-              size={140}
-            />
-            <div className="mt-4 flex items-center gap-2 relative">
-              <span className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] uppercase tracking-wide text-neutral-300">
-                {category}
-              </span>
-              <span className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">
-                {roleLabel}
-              </span>
-            </div>
+            {anamMode && anamSessionToken ? (
+              <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                <AnamAvatar sessionToken={anamSessionToken} interviewerName={roleLabel} />
+              </div>
+            ) : anamMode && anamLoading ? (
+              <div className="flex flex-col items-center justify-center gap-3 text-slate-300 py-12">
+                <div className="w-12 h-12 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+                <span className="text-xs font-medium text-indigo-300">Connecting to Anam HD Avatar...</span>
+              </div>
+            ) : (
+              <>
+                <InterviewerAvatar
+                  state={avatarState}
+                  micLevel={micLevel}
+                  speakTick={speakTick}
+                  surfaceClassName="fill-slate-900"
+                  size={140}
+                />
+                <div className="mt-4 flex items-center gap-2 relative">
+                  <span className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] uppercase tracking-wide text-neutral-300">
+                    {category}
+                  </span>
+                  <span className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">
+                    {roleLabel}
+                  </span>
+                </div>
+              </>
+            )}
           </MeetingTile>
         </div>
       </div>

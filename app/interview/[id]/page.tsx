@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Volume2, VolumeX, RotateCcw, Loader2, AlertCircle } from "lucide-react";
+import { Mic, Volume2, VolumeX, RotateCcw, Loader2, AlertCircle, Sparkles } from "lucide-react";
 import { ResumeUpload } from "@/components/resume-upload";
 import { InterviewerAvatar } from "@/components/interviewer-avatar";
+import { AnamAvatar } from "@/components/anam-avatar";
 import { CandidateCamera } from "@/components/candidate-camera";
 import { InterviewProgress } from "@/components/interview/InterviewProgress";
 import { MeetingModeCall } from "@/components/interview/meeting-mode-call";
@@ -147,6 +148,9 @@ export default function CandidateInterview() {
   // typed-answer panel for when the candidate prefers to type. Forces voice
   // + camera on since the mode is meaningless without them.
   const [meetingMode, setMeetingMode] = useState(false);
+  const [anamMode, setAnamMode] = useState(false);
+  const [anamToken, setAnamToken] = useState<string | null>(null);
+  const [anamLoading, setAnamLoading] = useState(false);
   // Mic auto-listen toggle, meeting-mode only — ON by default. When on, the
   // mic starts listening automatically the moment the interviewer finishes
   // speaking (see the tts.isSpeaking watcher effect below).
@@ -164,6 +168,47 @@ export default function CandidateInterview() {
   // Bumped once per TTS word boundary — drives the avatar's speaking pulse.
   // See components/interviewer-avatar.tsx for why this isn't true lip sync.
   const [speakTick, setSpeakTick] = useState(0);
+
+  async function fetchAnamToken() {
+    if (anamToken) return anamToken;
+    setAnamLoading(true);
+    try {
+      const res = await fetch("/api/anam-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          candidateName: candidateName || "Candidate",
+          targetRole: targetRole || "Software Engineer",
+          targetLevel: targetLevel || "Mid-Level",
+          targetCompany: targetCompany || "Tech Company",
+          resumeSummary: resumeText || "",
+          existingQuestions: questions,
+          interviewerName: callRoleLabel || "Sarah Miller",
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.sessionToken) {
+        setAnamToken(data.sessionToken);
+        return data.sessionToken;
+      }
+    } catch (e) {
+      console.error("Failed to fetch Anam session token:", e);
+    } finally {
+      setAnamLoading(false);
+    }
+    return null;
+  }
+
+  async function toggleAnamMode() {
+    const next = !anamMode;
+    setAnamMode(next);
+    if (next) {
+      tts.cancel();
+      if (!anamToken) {
+        await fetchAnamToken();
+      }
+    }
+  }
 
   // ---------- Dynamic follow-up (Phase 13) state ----------
   const MAX_FOLLOWUPS = 3; // cap total follow-ups per interview (cost + pacing)
@@ -291,8 +336,13 @@ export default function CandidateInterview() {
   }, [interviewId]);
 
   // Speak the current question aloud whenever it changes (Phase 12: TTS)
+  // When Anam HD Avatar mode is active, native browser TTS is disabled so voices never overlap.
   useEffect(() => {
     if (stage !== "interview" || !voiceEnabled || !voiceSupported) return;
+    if (anamMode) {
+      tts.cancel();
+      return;
+    }
     if (!currentQuestion) return;
 
     setWordsSpokenInQuestion(0); // fresh caption for the new question
@@ -311,7 +361,7 @@ export default function CandidateInterview() {
       tts.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stage, currentIndex, activeFollowUp, voiceEnabled, voiceSupported, selectedVoiceName]);
+  }, [stage, currentIndex, activeFollowUp, voiceEnabled, voiceSupported, selectedVoiceName, anamMode]);
 
   // Meeting-mode caption fallback: onBoundary above is best-effort — some
   // browser voices never fire word-boundary events at all (see the note in
@@ -393,6 +443,7 @@ export default function CandidateInterview() {
   }, []);
 
   function replayQuestion() {
+    if (anamMode) return;
     if (!voiceSupported || !currentQuestion) return;
     tts.speak(currentQuestion.question, {
       voiceName: selectedVoiceName || undefined,
@@ -450,6 +501,9 @@ export default function CandidateInterview() {
     setFollowUpCount(0);
     setReviewingIndex(null);
     setCallStartedAt(Date.now());
+    if (anamMode && !anamToken) {
+      fetchAnamToken();
+    }
     setStage("interview");
   }
 
@@ -773,6 +827,40 @@ export default function CandidateInterview() {
               Show my webcam during the interview (for a realistic feel — never recorded or stored)
             </label>
 
+            {/* Anam AI HD Photorealistic Avatar Mode Card */}
+            <div className="p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/5 space-y-2">
+              <label className="flex items-start gap-3 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={anamMode}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setAnamMode(checked);
+                    if (checked) {
+                      setMeetingMode(true);
+                      setVoiceEnabled(true);
+                      setCameraEnabled(true);
+                    }
+                  }}
+                  className="h-4 w-4 mt-1 accent-indigo-500 rounded"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-foreground flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      Anam AI Live HD Avatar Mode
+                    </span>
+                    <Badge className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] px-2 py-0">
+                      New
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    Conduct your interview with a real-time photorealistic video avatar (Cara-4 HD) with natural lip-sync and dialogue. Uncheck to use the classic 2D animated avatar.
+                  </p>
+                </div>
+              </label>
+            </div>
+
             {voiceSupported && voiceInputSupported && (
               <label className="flex items-start gap-2 text-sm text-muted-foreground">
                 <input
@@ -921,6 +1009,10 @@ export default function CandidateInterview() {
           }
           onNext={handleNext}
           onSkip={handleSkip}
+          anamMode={anamMode}
+          anamSessionToken={anamToken}
+          anamLoading={anamLoading}
+          onToggleAnamMode={toggleAnamMode}
         />
       );
     }
@@ -1003,6 +1095,13 @@ export default function CandidateInterview() {
                         </div>
                       );
                     })}
+                  </div>
+                ) : anamMode && anamToken ? (
+                  <div
+                    className="rounded-2xl border border-indigo-500/40 bg-slate-950 overflow-hidden flex flex-col items-center justify-center p-2 shadow-2xl"
+                    style={{ width: 320, height: 210 }}
+                  >
+                    <AnamAvatar sessionToken={anamToken} interviewerName={callRoleLabel} />
                   </div>
                 ) : (
                   <div

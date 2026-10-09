@@ -1,34 +1,34 @@
-// TARGET PATH: components/interviewer-avatar.tsx
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnamAvatar } from "@/components/anam-avatar";
 
 interface InterviewerAvatarProps {
   state: "idle" | "listening" | "speaking";
-  // 0..1 live microphone amplitude from useAudioLevel — only meaningful
-  // while state === "listening". This is genuine audio reactivity.
+  sessionToken?: string;
+  interviewerName?: string;
   micLevel?: number;
-  // Bump this once per TTS onBoundary event (one per spoken word). Drives a
-  // brief mouth-open pulse. NOT true phoneme sync — native SpeechSynthesis
-  // doesn't expose its own audio to the Web Audio API, so per-word boundary
-  // timing is the most accurate free signal available. Deliberately not
-  // pretending to be more precise than that.
   speakTick?: number;
-  // Tailwind fill class matching whatever surface this avatar sits directly
-  // on, so the mouth cutout blends in rather than showing as a visible hole.
-  // Defaults to the page background.
   surfaceClassName?: string;
-  // Rendered pixel size of the (square) SVG. Defaults to 80.
   size?: number;
 }
 
 export function InterviewerAvatar({
   state,
+  sessionToken,
+  interviewerName = "Sarah Miller",
   micLevel = 0,
   speakTick = 0,
   surfaceClassName = "fill-background",
   size = 80,
 }: InterviewerAvatarProps) {
+  if (sessionToken) {
+    return (
+      <div className="w-full h-full max-w-md mx-auto">
+        <AnamAvatar sessionToken={sessionToken} interviewerName={interviewerName} />
+      </div>
+    );
+  }
   const [speakPulse, setSpeakPulse] = useState(false);
 
   useEffect(() => {
