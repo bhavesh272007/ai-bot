@@ -2,7 +2,7 @@
 
 .page {
   font-family: var(--font-inter), sans-serif;
-  color: #111111;
+  color: var(--foreground);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   background:
@@ -10,6 +10,11 @@
     linear-gradient(180deg, #c6f24a 0%, #a3ec5c 20%, #7fe3a0 38%, #6fe0c0 52%, #7fe8dd 62%, #cdf3ec 78%, #ffffff 92%);
   display: flex;
   flex-direction: column;
+}
+:global(.dark) .page {
+  background:
+    radial-gradient(circle at 50% 8%, rgba(6, 52, 56, 0.5) 0%, rgba(10, 74, 78, 0.35) 10%, transparent 38%),
+    linear-gradient(180deg, #040706 0%, #050b0b 20%, #07171d 38%, #0a2a16 52%, #0c3739 62%, #07171d 78%, #040706 92%);
 }
 
 /* ===== Top bar ===== */
@@ -28,14 +33,14 @@
   gap: 10px;
   font-weight: 700;
   font-size: 17px;
-  color: #111111;
+  color: var(--foreground);
   text-decoration: none;
 }
 .logoBadge {
   width: 24px;
   height: 24px;
-  background: #111;
-  color: #fff;
+  background: var(--foreground);
+  color: var(--primary-foreground);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -48,7 +53,7 @@
 .backHome {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--foreground);
   text-decoration: none;
   opacity: 0.8;
   display: inline-flex;
@@ -73,15 +78,15 @@
   font-family: var(--font-caveat), cursive;
   font-size: 21px;
   font-weight: 600;
-  color: #a63d40;
+  color: var(--destructive);
   transform: rotate(8deg);
   z-index: 1;
 }
 
 /* ===== Big card ===== */
 .card {
-  background: #fff;
-  border: 1px solid #ececec;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 28px;
   padding: 48px;
   width: 100%;
@@ -92,8 +97,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: #eefac0;
-  color: #2f6e51;
+  background: var(--accent);
+  color: var(--accent-foreground);
   border: 1px solid rgba(47, 110, 81, 0.25);
   padding: 6px 14px;
   border-radius: 30px;
@@ -107,13 +112,13 @@
   font-weight: 500;
   font-size: 32px;
   letter-spacing: -0.01em;
-  color: #161616;
+  color: var(--foreground);
   margin-bottom: 10px;
   text-align: center;
 }
 .subtitle {
   font-size: 14.5px;
-  color: rgba(20, 20, 20, 0.58);
+  color: var(--muted-foreground);
   line-height: 1.6;
   text-align: center;
   max-width: 400px;
@@ -124,14 +129,14 @@
 .tips {
   margin-top: 32px;
   padding-top: 28px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border);
 }
 .tipsLabel {
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: rgba(20, 20, 20, 0.45);
+  color: var(--muted-foreground);
   margin-bottom: 14px;
 }
 .tipsList {
@@ -144,7 +149,7 @@
   align-items: flex-start;
   gap: 10px;
   font-size: 13.5px;
-  color: rgba(20, 20, 20, 0.65);
+  color: var(--muted-foreground);
   line-height: 1.5;
 }
 .tipDot {
@@ -152,8 +157,8 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #eefac0;
-  color: #2f6e51;
+  background: var(--accent);
+  color: var(--accent-foreground);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -165,19 +170,19 @@
 .continuePanel {
   margin-top: 28px;
   padding-top: 24px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border);
   text-align: center;
 }
 .continueTitle {
   font-family: var(--font-playfair), serif;
   font-weight: 500;
   font-size: 19px;
-  color: #161616;
+  color: var(--foreground);
   margin-bottom: 6px;
 }
 .continueSub {
   font-size: 13.5px;
-  color: rgba(20, 20, 20, 0.55);
+  color: var(--muted-foreground);
   margin-bottom: 18px;
 }
 .continueBtn {
@@ -185,8 +190,8 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: #111;
-  color: #fff;
+  background: var(--foreground);
+  color: var(--primary-foreground);
   border: none;
   padding: 14px 28px;
   border-radius: 30px;

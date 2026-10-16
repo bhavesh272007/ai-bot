@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertCircle, ArrowLeft, ArrowRight } from "lucide-react";
 import { toDisplayScore } from "@/lib/scoring";
+import styles from "./page.module.css";
 
 interface Stats {
   average_score: number;
@@ -26,8 +27,6 @@ function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-const PAGE_GRADIENT =
-  "radial-gradient(circle at 50% 0%, #f2ff6b 0%, #d4f24f 10%, transparent 32%), linear-gradient(180deg, #c6f24a 0%, #a3ec5c 8%, #7fe3a0 16%, #6fe0c0 24%, #7fe8dd 32%, #cdf3ec 42%, #ffffff 56%)";
 
 const STEP_ORDER = ["email", "answer", "result"] as const;
 type UiStep = (typeof STEP_ORDER)[number];
@@ -201,7 +200,7 @@ export default function WeeklyChallenge() {
   // ---------- Email gate ----------
   if (!submittedEmail) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4 py-12" style={{ background: PAGE_GRADIENT }}>
+      <main className={`min-h-screen flex items-center justify-center px-4 py-12 ${styles.pageBg}`}>
         <div className="w-full max-w-md space-y-5">
           <div className="pb-1">
             <StepIndicator step="email" />
@@ -261,7 +260,7 @@ export default function WeeklyChallenge() {
   // ---------- Loading ----------
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center" style={{ background: PAGE_GRADIENT }}>
+      <main className={`min-h-screen flex items-center justify-center ${styles.pageBg}`}>
         <p className="text-muted-foreground flex items-center gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading this week's challenge...
@@ -272,7 +271,7 @@ export default function WeeklyChallenge() {
 
   if (loadError) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4" style={{ background: PAGE_GRADIENT }}>
+      <main className={`min-h-screen flex items-center justify-center px-4 ${styles.pageBg}`}>
         <div className="max-w-md w-full space-y-4">
           <Card>
             <CardContent className="py-10 text-center">
@@ -293,7 +292,7 @@ export default function WeeklyChallenge() {
   const uiStep: UiStep = resolvedAttempt ? "result" : "answer";
 
   return (
-    <main className="min-h-screen px-4 py-12" style={{ background: PAGE_GRADIENT }}>
+    <main className={`min-h-screen px-4 py-12 ${styles.pageBg}`}>
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="text-center space-y-1">
           <p className="label-mono">This week's challenge</p>

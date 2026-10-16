@@ -21,17 +21,13 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const STORAGE_KEY = "theme";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // The inline script in layout.tsx already sets the class on <html>
-  // before hydration, so we just read it back here to stay in sync.
-  const [theme, setThemeState] = useState<Theme>("light");
-
-  useEffect(() => {
-    const root = document.documentElement;
+  // Initialize from localStorage / DOM class so toggleTheme's first
+  // invocation sees the real current theme instead of a placeholder.
+  const [theme, setThemeState] = useState<Theme>(() => {
+    if (typeof window === "undefined") return "light";
     const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
-    const initial: Theme =
-      stored ?? (root.classList.contains("dark") ? "dark" : "light");
-    setThemeState(initial);
-  }, []);
+    return stored ?? (document.documentElement.classList.contains("dark") ? "dark" : "light");
+  });
 
   const setTheme = useCallback((next: Theme) => {
     setThemeState(next);

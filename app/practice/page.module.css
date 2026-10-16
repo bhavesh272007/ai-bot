@@ -2,7 +2,7 @@
 
 .page {
   font-family: var(--font-inter), sans-serif;
-  color: #111111;
+  color: var(--foreground);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   background:
@@ -14,6 +14,14 @@
   background-repeat: no-repeat;
   display: flex;
   flex-direction: column;
+}
+:global(.dark) .page {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(6, 52, 56, 0.5) 0%, rgba(10, 74, 78, 0.35) 10%, transparent 26%),
+    linear-gradient(180deg, #040706 0%, #050b0b 6%, #07171d 11%, #0a2a16 15%, #0c3739 18%, #07171d 22%, transparent 30%),
+    radial-gradient(circle at 50% 100%, rgba(6, 52, 56, 0.5) 0%, rgba(10, 74, 78, 0.35) 10%, transparent 26%),
+    linear-gradient(0deg, #040706 0%, #050b0b 6%, #07171d 11%, #0a2a16 15%, #0c3739 18%, #07171d 22%, transparent 30%),
+    #0B0B0C;
 }
 
 /* ===== Top bar ===== */
@@ -32,14 +40,14 @@
   gap: 10px;
   font-weight: 700;
   font-size: 17px;
-  color: #111111;
+  color: var(--foreground);
   text-decoration: none;
 }
 .logoBadge {
   width: 24px;
   height: 24px;
-  background: #111;
-  color: #fff;
+  background: var(--foreground);
+  color: var(--primary-foreground);
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -52,7 +60,7 @@
 .backHome {
   font-size: 13.5px;
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--foreground);
   text-decoration: none;
   opacity: 0.8;
   display: inline-flex;
@@ -71,8 +79,8 @@
 
 /* ===== Big card ===== */
 .card {
-  background: #fff;
-  border: 1px solid #ececec;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 28px;
   padding: 48px;
   width: 100%;
@@ -83,8 +91,8 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: #eefac0;
-  color: #2f6e51;
+  background: var(--accent);
+  color: var(--accent-foreground);
   border: 1px solid rgba(47, 110, 81, 0.25);
   padding: 6px 14px;
   border-radius: 30px;
@@ -98,12 +106,12 @@
   font-weight: 500;
   font-size: 36px;
   letter-spacing: -0.01em;
-  color: #161616;
+  color: var(--foreground);
   margin-bottom: 12px;
 }
 .intro {
   font-size: 15px;
-  color: rgba(20, 20, 20, 0.6);
+  color: var(--muted-foreground);
   line-height: 1.65;
   max-width: 620px;
   margin-bottom: 40px;
@@ -113,7 +121,7 @@
 .section {
   margin-bottom: 36px;
   padding-top: 36px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--border);
 }
 .section:first-of-type {
   padding-top: 0;
@@ -124,12 +132,12 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: rgba(20, 20, 20, 0.45);
+  color: var(--muted-foreground);
   margin-bottom: 6px;
 }
 .sectionHint {
   font-size: 13.5px;
-  color: rgba(20, 20, 20, 0.5);
+  color: var(--muted-foreground);
   margin-bottom: 16px;
   line-height: 1.5;
 }
@@ -151,24 +159,24 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: rgba(20, 20, 20, 0.45);
+  color: var(--muted-foreground);
 }
 .input {
   width: 100%;
-  background: #fafafa;
-  border: 1.5px solid #ececec;
+  background: var(--card);
+  border: 1.5px solid var(--border);
   border-radius: 14px;
   padding: 13px 16px;
   font-size: 14.5px;
   font-family: inherit;
-  color: #111;
+  color: var(--foreground);
   transition: border-color .15s ease, background .15s ease;
 }
-.input::placeholder { color: rgba(20, 20, 20, 0.35); }
+.input::placeholder { color: var(--muted-foreground); }
 .input:focus {
   outline: none;
-  border-color: #7fe3a0;
-  background: #fff;
+  border-color: var(--ring);
+  background: var(--background);
 }
 
 /* ===== Experience level pills ===== */
@@ -178,9 +186,9 @@
   gap: 10px;
 }
 .levelBtn {
-  border: 1.5px solid #ececec;
-  background: #fafafa;
-  color: rgba(20, 20, 20, 0.6);
+  border: 1.5px solid var(--border);
+  background: var(--secondary);
+  color: var(--muted-foreground);
   padding: 12px 14px;
   border-radius: 30px;
   font-size: 14px;
@@ -189,12 +197,12 @@
   cursor: pointer;
   transition: all .15s ease;
 }
-.levelBtn:hover { border-color: #d8d8d8; color: #111; }
+.levelBtn:hover { border-color: var(--border); color: var(--foreground); }
 .levelBtnActive,
 .levelBtnActive:hover {
-  background: #111;
-  border-color: #111;
-  color: #fff;
+  background: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--primary-foreground);
 }
 
 /* ===== Interviewer personality cards ===== */
@@ -205,8 +213,8 @@
 }
 .personalityCard {
   text-align: left;
-  border: 1.5px solid #ececec;
-  background: #fafafa;
+  border: 1.5px solid var(--border);
+  background: var(--secondary);
   border-radius: 16px;
   padding: 16px;
   cursor: pointer;
@@ -223,7 +231,7 @@
   align-items: center;
   font-size: 14px;
   font-weight: 700;
-  color: #111;
+  color: var(--foreground);
   margin-bottom: 6px;
 }
 .personalityDot {
@@ -234,7 +242,7 @@
 }
 .personalityDesc {
   font-size: 12.5px;
-  color: rgba(20, 20, 20, 0.55);
+  color: var(--muted-foreground);
   line-height: 1.5;
 }
 .personalitySelected {
@@ -269,7 +277,7 @@
 .toggleTrack {
   position: absolute;
   inset: 0;
-  background: #e2e2e2;
+  background: var(--border);
   border-radius: 30px;
   transition: background .2s ease;
 }
@@ -280,13 +288,13 @@
   left: 3px;
   width: 18px;
   height: 18px;
-  background: #fff;
+  background: var(--card);
   border-radius: 50%;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   transition: transform .2s ease;
 }
 .toggleSwitch input:checked ~ .toggleTrack {
-  background: #2f6e51;
+  background: var(--verified);
 }
 .toggleSwitch input:checked ~ .toggleTrack::after {
   transform: translateX(18px);
@@ -295,26 +303,26 @@
 .toggleTitle {
   font-size: 14.5px;
   font-weight: 600;
-  color: #111;
+  color: var(--foreground);
   cursor: pointer;
 }
 .toggleDesc {
   font-size: 13px;
-  color: rgba(20, 20, 20, 0.5);
+  color: var(--muted-foreground);
   line-height: 1.55;
   margin-top: 4px;
 }
 .toggleNote {
   display: block;
   margin-top: 6px;
-  color: rgba(20, 20, 20, 0.65);
+  color: var(--muted-foreground);
 }
 
 /* ===== Submit ===== */
 .submitBtn {
   width: 100%;
-  background: #111;
-  color: #fff;
+  background: var(--foreground);
+  color: var(--primary-foreground);
   border: none;
   padding: 16px 22px;
   border-radius: 30px;
@@ -336,7 +344,7 @@
 
 .helperText {
   font-size: 13px;
-  color: rgba(20, 20, 20, 0.45);
+  color: var(--muted-foreground);
   text-align: center;
   margin-top: 14px;
 }
@@ -346,7 +354,7 @@
   justify-content: center;
   gap: 7px;
   font-size: 13px;
-  color: #a63d40;
+  color: var(--destructive);
   text-align: center;
   margin-top: 14px;
 }
