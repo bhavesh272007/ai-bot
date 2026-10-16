@@ -29,13 +29,17 @@ export function AnamAvatar({
   const [isMuted, setIsMuted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [canRetry, setCanRetry] = useState(true);
 
   const clientRef = useRef<any>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const isCleaningUpRef = useRef(false);
+  const isInitializingRef = useRef(false); // Guard against concurrent init calls
 
   const cleanupActiveSession = useCallback(async () => {
+    if (isCleaningUpRef.current) return; // Prevent re-entrant cleanup
     isCleaningUpRef.current = true;
+
     if (clientRef.current?.stopStreaming) {
       try {
         await clientRef.current.stopStreaming();
@@ -52,12 +56,20 @@ export function AnamAvatar({
       }
       activeGlobalAnamClient = null;
     }
+
+    // Give Anam's edge gateway time to register session closure
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
     setIsConnected(false);
     isCleaningUpRef.current = false;
   }, []);
 
   const initSession = useCallback(async () => {
     if (!sessionToken) return;
+
+    // Guard: don't start a new init if one is already in progress
+    if (isInitializingRef.current) return;
+    isInitializingRef.current = true;
 
     setIsConnecting(true);
     setErrorMsg(null);
@@ -67,7 +79,8 @@ export function AnamAvatar({
       await cleanupActiveSession();
 
       // Brief delay to allow Anam's edge gateway to register session closure
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // cleanupActiveSession already has a 600ms delay, but adding a small buffer for safety
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // 2. Create new Anam client
       const client = createClient(sessionToken);
@@ -113,12 +126,17 @@ export function AnamAvatar({
         setErrorMsg(
           "Concurrency limit reached on Anam AI (1 active session allowed). A previous connection was still closing. Please wait 5 seconds and click Retry."
         );
+        // Auto-recovery: retry after delay
+        setCanRetry(false);
+        setTimeout(() => setCanRetry(true), 5000);
       } else {
         setErrorMsg(err?.message || "Failed to establish WebRTC connection to avatar.");
       }
 
       setIsConnecting(false);
       onError?.(err);
+    } finally {
+      isInitializingRef.current = false;
     }
   }, [sessionToken, cleanupActiveSession, onError]);
 
@@ -177,18 +195,16 @@ export function AnamAvatar({
         <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-900/80 backdrop-blur-md border border-slate-700/60 shadow-lg">
           <div className="relative flex items-center justify-center">
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
-                isConnected
-                  ? isUserSpeaking
-                    ? "bg-indigo-400 animate-ping"
-                    : "bg-emerald-500"
-                  : "bg-amber-400 animate-pulse"
-              }`}
+              className={`w-2.5 h-2.5 rounded-full ${isConnected
+                ? isUserSpeaking
+                  ? "bg-indigo-400 animate-ping"
+                  : "bg-emerald-500"
+                : "bg-amber-400 animate-pulse"
+                }`}
             />
             <span
-              className={`absolute w-2.5 h-2.5 rounded-full ${
-                isConnected ? (isUserSpeaking ? "bg-indigo-400" : "bg-emerald-500") : "bg-amber-400"
-              }`}
+              className={`absolute w-2.5 h-2.5 rounded-full ${isConnected ? (isUserSpeaking ? "bg-indigo-400" : "bg-emerald-500") : "bg-amber-400"
+                }`}
             />
           </div>
           <span className="text-xs font-semibold text-white tracking-wide flex items-center gap-1.5">
@@ -237,9 +253,10 @@ export function AnamAvatar({
             size="sm"
             onClick={initSession}
             variant="outline"
+            disabled={!canRetry}
             className="mt-2 border-slate-700 bg-slate-900 hover:bg-slate-800 text-white gap-2"
           >
-            <RefreshCw className="w-3.5 h-3.5" /> Reconnect Avatar
+            <RefreshCw className={`w-3.5 h-3.5 ${!canRetry ? "animate-spin" : ""}`} /> Reconnect Avatar
           </Button>
         </div>
       )}
@@ -249,11 +266,10 @@ export function AnamAvatar({
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2 rounded-2xl bg-slate-900/85 backdrop-blur-xl border border-slate-700/60 shadow-2xl z-10 transition-opacity">
           <button
             onClick={toggleMute}
-            className={`p-2 rounded-xl transition-all ${
-              isMuted
-                ? "bg-rose-500/20 text-rose-400 hover:bg-rose-500/30"
-                : "bg-slate-800 text-slate-200 hover:bg-slate-700"
-            }`}
+            className={`p-2 rounded-xl transition-all ${isMuted
+              ? "bg-rose-500/20 text-rose-400 hover:bg-rose-500/30"
+              : "bg-slate-800 text-slate-200 hover:bg-slate-700"
+              }`}
             title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
           >
             {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
