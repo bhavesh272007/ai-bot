@@ -1,4 +1,4 @@
-// TARGET PATH: components/site-header.tsx
+﻿// TARGET PATH: components/site-header.tsx
 "use client";
 
 import { useState } from "react";
@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import CareerChatWidget from "@/components/career-chat-widget";
 
 const NAV_LINKS = [
-  { label: "✨ Live Avatar (Anam AI)", href: "/test-avatar" },
+  { label: "🎥 Free 3D Avatar", href: "/test-avatar" },
   { label: "FAQ", href: "/#faq" },
   { label: "What We Cover", href: "/#what-we-cover" },
   { label: "Weekly Challenge", href: "/challenge" },

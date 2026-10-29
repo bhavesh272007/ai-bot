@@ -12,6 +12,7 @@ import {
 } from "@/components/interview/meeting-shell";
 import { MeetingTile, MicStatusPill } from "@/components/interview/meeting-tile";
 import type { NetworkInfo } from "@/lib/voice/useNetworkInfo";
+import type { LipSyncFrame } from "@/lib/voice/useLipSync";
 
 interface MeetingModeCallProps {
   category: string;
@@ -58,6 +59,8 @@ interface MeetingModeCallProps {
   anamSessionToken?: string | null;
   anamLoading?: boolean;
   onToggleAnamMode?: () => void;
+  avatarVariant?: "video" | "svg";
+  lipSyncFrame?: LipSyncFrame;
 }
 
 // The dark "video call" skin for the Q&A stage. All the actual interview logic
@@ -100,6 +103,8 @@ export function MeetingModeCall({
   anamSessionToken = null,
   anamLoading = false,
   onToggleAnamMode,
+  avatarVariant = "video",
+  lipSyncFrame,
 }: MeetingModeCallProps) {
   const questionWords = questionText ? questionText.split(" ") : [];
   const revealedCaption = questionWords.slice(0, revealedWordCount).join(" ");
@@ -117,15 +122,15 @@ export function MeetingModeCall({
             <button
               type="button"
               onClick={onToggleAnamMode}
-              title={anamMode ? "Switch to 2D Bot" : "Switch to Anam HD Avatar"}
+              title={anamMode ? "Switch to Video Interviewer" : "Switch to Anam HD"}
               className={`h-11 px-3.5 rounded-full border flex items-center gap-1.5 text-xs font-semibold transition-all ${
                 anamMode
                   ? "border-indigo-500 bg-indigo-500/25 text-indigo-200 shadow-lg shadow-indigo-500/25 ring-1 ring-indigo-400/50"
-                  : "border-neutral-700 text-neutral-300 hover:bg-neutral-900"
+                  : "border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
               }`}
             >
-              <Sparkles className="h-3.5 w-3.5 text-indigo-400 animate-pulse" />
-              <span>{anamMode ? "✨ Anam HD Active" : "✨ Switch to Anam HD"}</span>
+              <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+              <span>{anamMode ? "✨ Anam HD Active" : "🎥 Video Interviewer Active"}</span>
             </button>
           )}
 
@@ -212,7 +217,7 @@ export function MeetingModeCall({
             }
           >
             {cameraEnabled ? (
-              <CandidateCamera autoStart width={480} height={420} />
+              <CandidateCamera autoStart fill />
             ) : (
               <p className="text-neutral-600 text-sm">Camera is off</p>
             )}
@@ -240,23 +245,18 @@ export function MeetingModeCall({
                 <span className="text-xs font-medium text-indigo-300">Connecting to Anam HD Avatar...</span>
               </div>
             ) : (
-              <>
-                <InterviewerAvatar
-                  state={avatarState}
-                  micLevel={micLevel}
-                  speakTick={speakTick}
-                  surfaceClassName="fill-slate-900"
-                  size={140}
-                />
-                <div className="mt-4 flex items-center gap-2 relative">
-                  <span className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] uppercase tracking-wide text-neutral-300">
-                    {category}
-                  </span>
-                  <span className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">
-                    {roleLabel}
-                  </span>
-                </div>
-              </>
+              <InterviewerAvatar
+                state={avatarState}
+                micLevel={micLevel}
+                speakTick={speakTick}
+                surfaceClassName="fill-slate-900"
+                size={140}
+                fill
+                roleLabel={roleLabel}
+                caption={revealedCaption}
+                variant={avatarVariant}
+                lipSyncFrame={lipSyncFrame}
+              />
             )}
           </MeetingTile>
         </div>

@@ -1,4 +1,4 @@
-// TARGET PATH: app/page.tsx
+﻿// TARGET PATH: app/page.tsx
 // Replaces the old Hall Ticket landing page. Header/nav is now inlined here
 
 "use client";
@@ -137,7 +137,7 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* ---------- CANDIDATE / RECRUITER SPLIT ---------- */}
+        {/* ---------- CANDIDATE / RECRUITER / AVATAR SPLIT ---------- */}
         <div className={styles.splitWrap}>
           <div className={styles.splitCard}>
             <div className={styles.splitEyebrow}>Candidate stub</div>

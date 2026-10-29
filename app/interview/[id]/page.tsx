@@ -1,4 +1,4 @@
-// TARGET PATH: app/interview/[id]/page.tsx
+﻿// TARGET PATH: app/interview/[id]/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, Volume2, VolumeX, RotateCcw, Loader2, AlertCircle, Sparkles } from "lucide-react";
+import { Mic, Volume2, VolumeX, RotateCcw, Loader2, AlertCircle, Sparkles, Video, Bot } from "lucide-react";
 import { ResumeUpload } from "@/components/resume-upload";
 import { InterviewerAvatar } from "@/components/interviewer-avatar";
 import { AnamAvatar } from "@/components/anam-avatar";
@@ -17,6 +17,7 @@ import { InterviewProgress } from "@/components/interview/InterviewProgress";
 import { MeetingModeCall } from "@/components/interview/meeting-mode-call";
 import { MeetingHandoff } from "@/components/interview/meeting-handoff";
 import { useTextToSpeech } from "@/lib/voice/useTextToSpeech";
+import { useLipSync } from "@/lib/voice/useLipSync";
 import { useAudioLevel } from "@/lib/voice/useAudioLevel";
 import { useNetworkInfo } from "@/lib/voice/useNetworkInfo";
 import { useVoiceCapture } from "@/lib/voice/useVoiceCapture";
@@ -147,7 +148,8 @@ export default function CandidateInterview() {
   // card"); the answer is captured by voice by default, with an optional
   // typed-answer panel for when the candidate prefers to type. Forces voice
   // + camera on since the mode is meaningless without them.
-  const [meetingMode, setMeetingMode] = useState(false);
+  const [avatarType, setAvatarType] = useState<"free3d" | "anam" | "classic">("free3d");
+  const [meetingMode, setMeetingMode] = useState(true);
   const [anamMode, setAnamMode] = useState(false);
   const [anamToken, setAnamToken] = useState<string | null>(null);
   const [anamLoading, setAnamLoading] = useState(false);
@@ -164,6 +166,7 @@ export default function CandidateInterview() {
   const [wordsSpokenInQuestion, setWordsSpokenInQuestion] = useState(0);
   const [selectedVoiceName, setSelectedVoiceName] = useState("");
   const tts = useTextToSpeech();
+  const lipSync = useLipSync();
   const audioLevel = useAudioLevel();
   // Bumped once per TTS word boundary — drives the avatar's speaking pulse.
   // See components/interviewer-avatar.tsx for why this isn't true lip sync.
@@ -827,38 +830,140 @@ export default function CandidateInterview() {
               Show my webcam during the interview (for a realistic feel — never recorded or stored)
             </label>
 
-            {/* Anam AI HD Photorealistic Avatar Mode Card */}
-            <div className="p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/5 space-y-2">
-              <label className="flex items-start gap-3 text-sm cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={anamMode}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    setAnamMode(checked);
-                    if (checked) {
-                      setMeetingMode(true);
-                      setVoiceEnabled(true);
-                      setCameraEnabled(true);
-                    }
+            {/* Avatar & Interview Experience Selection */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <p className="label-mono font-semibold text-foreground">
+                  Interviewer Avatar Mode
+                </p>
+                <span className="text-[11px] text-muted-foreground">Select an avatar style</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                {/* 1. AI Video Interviewer (Sarah Miller) - Recommended */}
+                <div
+                  onClick={() => {
+                    setAvatarType("free3d");
+                    setAnamMode(false);
+                    setMeetingMode(true);
+                    setVoiceEnabled(true);
+                    setCameraEnabled(true);
                   }}
-                  className="h-4 w-4 mt-1 accent-indigo-500 rounded"
-                />
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      Anam AI Live HD Avatar Mode
-                    </span>
-                    <Badge className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] px-2 py-0">
-                      New
-                    </Badge>
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${avatarType === "free3d"
+                      ? "border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/30"
+                      : "border-border hover:border-slate-600 bg-card/60"
+                    }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${avatarType === "free3d" ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/30" : "bg-muted text-muted-foreground"
+                        }`}>
+                        <Video className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-foreground">
+                            AI Video Interviewer (Sarah Miller)
+                          </span>
+                          <Badge className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] px-2 py-0">
+                            ★ Recommended • 100% Free
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Live, two-way webcam interview with Sarah Miller. Full natural voice dialogue, active speaker border, zero tokens or GPU required.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${avatarType === "free3d" ? "border-emerald-500 bg-emerald-500" : "border-muted-foreground"
+                      }`}>
+                      {avatarType === "free3d" && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                    Conduct your interview with a real-time photorealistic video avatar (Cara-4 HD) with natural lip-sync and dialogue. Uncheck to use the classic 2D animated avatar.
-                  </p>
                 </div>
-              </label>
+
+                {/* 2. Anam AI HD Avatar (Paid API) */}
+                <div
+                  onClick={() => {
+                    setAvatarType("anam");
+                    setAnamMode(true);
+                    setMeetingMode(true);
+                    setVoiceEnabled(true);
+                    setCameraEnabled(true);
+                  }}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${avatarType === "anam"
+                      ? "border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10 ring-1 ring-indigo-500/30"
+                      : "border-border hover:border-slate-600 bg-card/60"
+                    }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${avatarType === "anam" ? "bg-indigo-500 text-white shadow-md shadow-indigo-500/30" : "bg-muted text-muted-foreground"
+                        }`}>
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-foreground">
+                            Anam AI Live HD Avatar
+                          </span>
+                          <Badge className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 text-[10px] px-2 py-0">
+                            Anam Key Required
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Neural video stream (Cara-4 HD) powered by Anam WebRTC cloud. Requires active Anam API subscription.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${avatarType === "anam" ? "border-indigo-500 bg-indigo-500" : "border-muted-foreground"
+                      }`}>
+                      {avatarType === "anam" && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Classic 2D Minimal Avatar */}
+                <div
+                  onClick={() => {
+                    setAvatarType("classic");
+                    setAnamMode(false);
+                    setMeetingMode(false);
+                  }}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative ${avatarType === "classic"
+                      ? "border-slate-500 bg-slate-500/10 shadow-lg ring-1 ring-slate-500/30"
+                      : "border-border hover:border-slate-600 bg-card/60"
+                    }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${avatarType === "classic" ? "bg-slate-700 text-white" : "bg-muted text-muted-foreground"
+                        }`}>
+                        <Bot className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-foreground">
+                            Classic 2D Animated Avatar
+                          </span>
+                          <Badge variant="outline" className="text-[10px] px-2 py-0">
+                            Lightweight Mode
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Clean vector animated avatar with standard text and audio cards. Best for slow connections.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${avatarType === "classic" ? "border-slate-400 bg-slate-400" : "border-muted-foreground"
+                      }`}>
+                      {avatarType === "classic" && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {voiceSupported && voiceInputSupported && (
@@ -932,8 +1037,8 @@ export default function CandidateInterview() {
               {personalizing
                 ? "Personalizing your questions..."
                 : resumeText
-                ? "Begin Interview (personalized)"
-                : "Begin Interview"}
+                  ? "Begin Interview (personalized)"
+                  : "Begin Interview"}
             </Button>
           </CardContent>
         </Card>
@@ -1002,10 +1107,10 @@ export default function CandidateInterview() {
             checkingFollowUp
               ? "One moment..."
               : activeFollowUp
-              ? "Submit Follow-up"
-              : currentIndex + 1 < questions.length
-              ? "Next Question"
-              : "Finish Interview"
+                ? "Submit Follow-up"
+                : currentIndex + 1 < questions.length
+                  ? "Next Question"
+                  : "Finish Interview"
           }
           onNext={handleNext}
           onSkip={handleSkip}
@@ -1013,6 +1118,8 @@ export default function CandidateInterview() {
           anamSessionToken={anamToken}
           anamLoading={anamLoading}
           onToggleAnamMode={toggleAnamMode}
+          avatarVariant={avatarType === "classic" ? "svg" : "video"}
+          lipSyncFrame={lipSync.frame}
         />
       );
     }
@@ -1071,11 +1178,10 @@ export default function CandidateInterview() {
                       return (
                         <div
                           key={role}
-                          className={`rounded-md border flex flex-col items-center justify-center px-3 py-2 transition-all duration-300 ${
-                            isActive
+                          className={`rounded-md border flex flex-col items-center justify-center px-3 py-2 transition-all duration-300 ${isActive
                               ? "border-seal bg-muted opacity-100 scale-100"
                               : "border-border bg-muted/40 opacity-50 scale-95"
-                          }`}
+                            }`}
                           style={{ width: 150, height: 190 }}
                         >
                           <InterviewerAvatar
@@ -1086,9 +1192,8 @@ export default function CandidateInterview() {
                             size={80}
                           />
                           <p
-                            className={`label-mono mt-1 text-center leading-tight ${
-                              isActive ? "text-seal" : "text-muted-foreground/50"
-                            }`}
+                            className={`label-mono mt-1 text-center leading-tight ${isActive ? "text-seal" : "text-muted-foreground/50"
+                              }`}
                           >
                             {PANEL_ROLE_LABELS[role]}
                           </p>
@@ -1199,11 +1304,10 @@ export default function CandidateInterview() {
                     onClick={toggleListening}
                     disabled={transcribing}
                     title={isListening ? "Stop recording" : "Answer by voice"}
-                    className={`absolute bottom-3 right-3 h-9 w-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-50 ${
-                      isListening
+                    className={`absolute bottom-3 right-3 h-9 w-9 rounded-full flex items-center justify-center transition-colors disabled:opacity-50 ${isListening
                         ? "bg-destructive text-background"
                         : "bg-foreground text-background hover:bg-foreground/80"
-                    }`}
+                      }`}
                   >
                     {isListening ? (
                       <span className="relative flex items-center justify-center h-full w-full">
@@ -1257,10 +1361,10 @@ export default function CandidateInterview() {
                 {checkingFollowUp
                   ? "One moment..."
                   : activeFollowUp
-                  ? "Submit Follow-up"
-                  : currentIndex + 1 < questions.length
-                  ? "Next Question"
-                  : "Finish Interview"}
+                    ? "Submit Follow-up"
+                    : currentIndex + 1 < questions.length
+                      ? "Next Question"
+                      : "Finish Interview"}
               </Button>
 
               <button
@@ -1368,9 +1472,9 @@ export default function CandidateInterview() {
 
             <Button
               onClick={() =>
-                (window.location.href = scoreResult.sessionId
-                  ? `/interview/${interviewId}/coding?session=${scoreResult.sessionId}`
-                  : `/interview/${interviewId}/coding`)
+              (window.location.href = scoreResult.sessionId
+                ? `/interview/${interviewId}/coding?session=${scoreResult.sessionId}`
+                : `/interview/${interviewId}/coding`)
               }
               className="w-full"
             >

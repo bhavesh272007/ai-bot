@@ -239,10 +239,9 @@ export function MeetingModeCoding({
               speakTick={speakTick}
               surfaceClassName="fill-slate-900"
               size={72}
+              fill
+              roleLabel={roleLabel}
             />
-            <span className="mt-2 rounded-full border border-neutral-700 px-2.5 py-0.5 text-[10px] text-neutral-300 relative">
-              {roleLabel}
-            </span>
           </MeetingTile>
 
           <MeetingTile

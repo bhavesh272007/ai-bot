@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { getInterviewType } from "@/lib/interview-types";
 import { getInterviewerPersonality } from "@/lib/interviewer-personalities";
+import { saveLocalInterview } from "@/lib/local-interview-store";
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
@@ -97,51 +98,72 @@ Return ONLY a valid JSON array, with no markdown formatting, no code fences, and
       personalityDef ? ` · ${personalityDef.title} interviewer` : ""
     }${panelMode ? " · panel mode" : ""}`;
 
-    const { data: interview, error: interviewError } = await supabase
-      .from("interviews")
-      .insert({
-        job_description: summary,
-        recruiter_id: null,
-        is_practice: true,
-        target_role: role,
-        target_company: company && company.trim() ? company : null,
-        target_level: levelLabel,
-        interviewer_personality: personalityDef?.id || null,
-        is_panel_mode: !!panelMode,
-      })
-      .select()
-      .single();
+    let interviewId: string | null = null;
 
-    if (interviewError) {
-      console.error("Failed to save practice interview:", interviewError);
-      return Response.json(
-        { error: "Failed to save interview to database." },
-        { status: 500 }
-      );
+    try {
+      const { data: interview, error: interviewError } = await supabase
+        .from("interviews")
+        .insert({
+          job_description: summary,
+          recruiter_id: null,
+          is_practice: true,
+          target_role: role,
+          target_company: company && company.trim() ? company : null,
+          target_level: levelLabel,
+          interviewer_personality: personalityDef?.id || null,
+          is_panel_mode: !!panelMode,
+        })
+        .select()
+        .single();
+
+      if (!interviewError && interview) {
+        interviewId = interview.id;
+
+        const questionRows = questions.map(
+          (q: { category: string; question: string }, i: number) => ({
+            interview_id: interview.id,
+            category: q.category,
+            question: q.question,
+            order_index: i,
+          })
+        );
+
+        const { error: questionsError } = await supabase
+          .from("questions")
+          .insert(questionRows);
+
+        if (questionsError) {
+          console.warn("Supabase questions insert error, will use local fallback:", questionsError);
+          interviewId = null;
+        }
+      } else {
+        console.warn("Supabase interview insert error (likely paused project or offline), using local fallback:", interviewError);
+      }
+    } catch (dbErr) {
+      console.warn("Supabase connection exception, using local fallback:", dbErr);
     }
 
-    const questionRows = questions.map(
-      (q: { category: string; question: string }, i: number) => ({
-        interview_id: interview.id,
-        category: q.category,
-        question: q.question,
-        order_index: i,
-      })
-    );
-
-    const { error: questionsError } = await supabase
-      .from("questions")
-      .insert(questionRows);
-
-    if (questionsError) {
-      console.error("Failed to save questions:", questionsError);
-      return Response.json(
-        { error: "Failed to save questions to database." },
-        { status: 500 }
-      );
+    // If Supabase was unavailable or errored, save to local fallback store so interview proceeds seamlessly
+    if (!interviewId) {
+      const fallbackId = `practice-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      saveLocalInterview({
+        interviewId: fallbackId,
+        isPractice: true,
+        targetRole: role,
+        targetCompany: company && company.trim() ? company : null,
+        targetLevel: levelLabel,
+        interviewerPersonality: personalityDef?.id || null,
+        isPanelMode: !!panelMode,
+        questions: questions.map((q: any) => ({
+          category: q.category,
+          question: q.question,
+        })),
+        createdAt: Date.now(),
+      });
+      interviewId = fallbackId;
     }
 
-    return Response.json({ interviewId: interview.id });
+    return Response.json({ interviewId });
   } catch (err) {
     console.error("generate-practice-questions error:", err);
     return Response.json(

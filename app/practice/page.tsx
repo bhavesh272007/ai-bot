@@ -1,4 +1,4 @@
-// TARGET PATH: app/practice/page.tsx
+﻿// TARGET PATH: app/practice/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -111,7 +111,9 @@ export default function Practice() {
           <span className={styles.logoBadge}>AI</span>
           Interview Booth
         </Link>
-        <Link href="/" className={styles.backHome}>← Back to home</Link>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <Link href="/" className={styles.backHome}>← Back to home</Link>
+        </div>
       </nav>
 
       <div className={styles.wrap}>

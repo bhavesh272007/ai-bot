@@ -2,25 +2,37 @@
 
 import { useEffect, useState } from "react";
 import { AnamAvatar } from "@/components/anam-avatar";
+import { VideoAvatar } from "@/components/video-avatar";
+import type { LipSyncFrame } from "@/lib/voice/useLipSync";
 
 interface InterviewerAvatarProps {
   state: "idle" | "listening" | "speaking";
   sessionToken?: string;
   interviewerName?: string;
+  roleLabel?: string;
   micLevel?: number;
   speakTick?: number;
   surfaceClassName?: string;
   size?: number;
+  variant?: "video" | "svg";
+  fill?: boolean;
+  caption?: string;
+  lipSyncFrame?: LipSyncFrame;
 }
 
 export function InterviewerAvatar({
   state,
   sessionToken,
   interviewerName = "Sarah Miller",
+  roleLabel,
   micLevel = 0,
   speakTick = 0,
   surfaceClassName = "fill-background",
   size = 80,
+  variant = "video",
+  fill = false,
+  caption,
+  lipSyncFrame,
 }: InterviewerAvatarProps) {
   if (sessionToken) {
     return (
@@ -29,6 +41,21 @@ export function InterviewerAvatar({
       </div>
     );
   }
+
+  if (variant === "video") {
+    return (
+      <VideoAvatar
+        state={state}
+        interviewerName={interviewerName}
+        roleLabel={roleLabel}
+        fill={fill}
+        caption={caption}
+        className={fill ? "" : "max-w-md w-full mx-auto"}
+        lipSyncFrame={lipSyncFrame}
+      />
+    );
+  }
+
   const [speakPulse, setSpeakPulse] = useState(false);
 
   useEffect(() => {

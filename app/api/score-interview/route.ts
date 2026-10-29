@@ -194,46 +194,42 @@ Return ONLY a valid JSON object, no markdown formatting, no code fences, no extr
         ? candidateName.trim().slice(0, 200)
         : null;
 
-    const { error: sessionError } = await supabase.from("sessions").insert({
-      id: sessionId,
-      interview_id: interviewId || null,
-      overall_score: result.overall_score,
-      overall_feedback: result.overall_feedback,
-      candidate_email: normalizedEmail,
-      candidate_name: normalizedName,
-    });
+    try {
+      const { error: sessionError } = await supabase.from("sessions").insert({
+        id: sessionId,
+        interview_id: interviewId?.startsWith("practice-") ? null : (interviewId || null),
+        overall_score: result.overall_score,
+        overall_feedback: result.overall_feedback,
+        candidate_email: normalizedEmail,
+        candidate_name: normalizedName,
+      });
 
-    if (sessionError) {
-      console.error("Failed to save session:", sessionError);
-      return Response.json(
-        { error: "Failed to save session to database.", ...devErrorDetail(sessionError) },
-        { status: 500 }
-      );
-    }
+      if (sessionError) {
+        console.warn("Notice: Failed to save session to Supabase (continuing with score):", sessionError.message);
+      } else {
+        const answerRows = result.answers.map(
+          (a: { question: string; score: number; strengths: string; improvements: string }, i: number) => ({
+            session_id: sessionId,
+            question_text: a.question,
+            answer_text: answers[i]?.answer || "",
+            score: a.score,
+            strengths: a.strengths,
+            improvements: a.improvements,
+            order_index: i,
+            category: answers[i]?.category || "Experience",
+          })
+        );
 
-    const answerRows = result.answers.map(
-      (a: { question: string; score: number; strengths: string; improvements: string }, i: number) => ({
-        session_id: sessionId,
-        question_text: a.question,
-        answer_text: answers[i]?.answer || "",
-        score: a.score,
-        strengths: a.strengths,
-        improvements: a.improvements,
-        order_index: i,
-        category: answers[i]?.category || "Experience",
-      })
-    );
+        const { error: answersError } = await supabase
+          .from("session_answers")
+          .insert(answerRows);
 
-    const { error: answersError } = await supabase
-      .from("session_answers")
-      .insert(answerRows);
-
-    if (answersError) {
-      console.error("Failed to save answers:", answersError);
-      return Response.json(
-        { error: "Failed to save answers to database.", ...devErrorDetail(answersError) },
-        { status: 500 }
-      );
+        if (answersError) {
+          console.warn("Notice: Failed to save answers to Supabase (continuing with score):", answersError.message);
+        }
+      }
+    } catch (dbErr) {
+      console.warn("Supabase session insert skipped due to connection:", dbErr);
     }
 
     // sessionId is threaded through to the coding round so a candidate's

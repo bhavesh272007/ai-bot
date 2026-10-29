@@ -103,12 +103,9 @@ export function MeetingHandoff({
             speakTick={speakTick}
             surfaceClassName="fill-slate-900"
             size={140}
+            fill
+            roleLabel={roleLabel}
           />
-          <div className="mt-4 flex items-center gap-2 relative">
-            <span className="rounded-full border border-neutral-700 px-3 py-1 text-[11px] text-neutral-300">
-              {roleLabel}
-            </span>
-          </div>
         </MeetingTile>
 
         {scoreError ? (
