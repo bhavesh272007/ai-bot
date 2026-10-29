@@ -1,0 +1,12 @@
+/* TARGET PATH: app/create/page.module.css */
+
+.pageBg {
+  background:
+    radial-gradient(circle at 50% 0%, #f2ff6b 0%, #d4f24f 10%, transparent 32%),
+    linear-gradient(180deg, #c6f24a 0%, #a3ec5c 8%, #7fe3a0 16%, #6fe0c0 24%, #7fe8dd 32%, #cdf3ec 42%, #ffffff 56%);
+}
+:global(.dark) .pageBg {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(6, 52, 56, 0.5) 0%, rgba(10, 74, 78, 0.35) 10%, transparent 26%),
+    linear-gradient(180deg, #040706 0%, #050b0b 8%, #07171d 16%, #0a2a16 24%, #0c3739 32%, #07171d 42%, #040706 56%);
+}

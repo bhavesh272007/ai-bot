@@ -19,6 +19,7 @@ import {
   ArrowRight,
   Sparkles,
 } from "lucide-react";
+import styles from "./page.module.css";
 
 const CATEGORIES = ["CS Fundamentals", "DSA", "Project/Resume", "Behavioral"] as const;
 
@@ -52,8 +53,6 @@ interface QuestionDraft {
 
 type Stage = "input" | "review" | "issued";
 
-const PAGE_GRADIENT =
-  "radial-gradient(circle at 50% 0%, #f2ff6b 0%, #d4f24f 10%, transparent 32%), linear-gradient(180deg, #c6f24a 0%, #a3ec5c 8%, #7fe3a0 16%, #6fe0c0 24%, #7fe8dd 32%, #cdf3ec 42%, #ffffff 56%)";
 
 function StepIndicator({ stage }: { stage: Stage }) {
   const currentIndex = STAGE_ORDER.indexOf(stage);
@@ -283,7 +282,7 @@ export default function CreateInterview() {
   }
 
   return (
-    <main className="min-h-screen px-4 py-12" style={{ background: PAGE_GRADIENT }}>
+    <main className={`min-h-screen px-4 py-12 ${styles.pageBg}`}>
       <div className="mx-auto max-w-3xl space-y-8">
         <div className="text-center space-y-3">
           <p className="label-mono">Recruiter tools</p>

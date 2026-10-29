@@ -12,6 +12,7 @@ import {
   ShoppingCart, Search, AppWindow, Rocket,
 } from "lucide-react";
 import CareerChatWidget from "@/components/career-chat-widget";
+import { useTheme } from "@/lib/theme-provider";
 import styles from "./page.module.css";
 
 const FAQS = [
@@ -86,6 +87,7 @@ function ChevronIcon() {
 
 export default function LandingPage() {
   const [chatOpen, setChatOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <div className={styles.page}>
@@ -110,6 +112,24 @@ export default function LandingPage() {
                 <span className={styles.navCareerChatDotCore} />
               </span>
               Career Chat
+            </button>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              data-theme={theme}
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              className={styles.themeToggle}
+            >
+              {theme === "dark" ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M21 12.79A9 9 0 0 1 11.21 3 7 7 0 0 0 12 17a7 7 0 0 0 9-4.21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M21 12.79A9 9 0 0 1 11.21 3 7 7 0 0 0 12 17a7 7 0 0 0 9-4.21Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              )}
             </button>
             <Link href="/login" className={styles.btnLogin}>Recruiter login</Link>
             <Link href="/practice" className={styles.btnGetstarted}>Start Practicing</Link>
